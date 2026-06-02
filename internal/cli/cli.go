@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/alexmchughdev/bootwrangler/internal/editor"
+	"github.com/alexmchughdev/bootwrangler/internal/library"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
 	"github.com/alexmchughdev/bootwrangler/internal/render"
 	"github.com/alexmchughdev/bootwrangler/internal/version"
@@ -16,6 +17,7 @@ Usage:
   bootwrangler <command>
 
 Commands:
+  library     Manage the local profile library
   profile     Manage provisioning profiles
   render      Render a profile into unattended installer assets
   version     Print the BootWrangler version
@@ -32,6 +34,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	switch args[0] {
+	case "library":
+		return runLibrary(args[1:], stdout, stderr)
 	case "profile":
 		return runProfile(args[1:], stdout, stderr)
 	case "render":
@@ -97,6 +101,96 @@ func parseProfileEditArgs(args []string) (string, error) {
 		return "", fmt.Errorf("usage: bootwrangler profile edit <profile.yaml> --editor nvim")
 	}
 	return args[0], nil
+}
+
+func runLibrary(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage:")
+		fmt.Fprintln(stderr, "  bootwrangler library init")
+		fmt.Fprintln(stderr, "  bootwrangler library list")
+		fmt.Fprintln(stderr, "  bootwrangler library add <profile.yaml>")
+		fmt.Fprintln(stderr, "  bootwrangler library show <name>")
+		fmt.Fprintln(stderr, "  bootwrangler library remove <name>")
+		return 2
+	}
+
+	lib := library.New(library.DefaultDir())
+
+	switch args[0] {
+	case "init":
+		if err := lib.Init(); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "initialised library at %s\n", library.DefaultDir())
+		return 0
+
+	case "list":
+		entries, err := lib.List()
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if len(entries) == 0 {
+			fmt.Fprintln(stdout, "no profiles in library")
+			return 0
+		}
+		for _, e := range entries {
+			fmt.Fprintf(stdout, "%-30s %s %s\n", e.Name, e.OSFamily, e.OSVersion)
+		}
+		return 0
+
+	case "add":
+		if len(args) != 2 {
+			fmt.Fprintln(stderr, "usage: bootwrangler library add <profile.yaml>")
+			return 2
+		}
+		p, err := profile.LoadAndValidateFile(args[1])
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		filename, err := lib.Add(p)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "added profile %q as %s\n", p.Name, filename)
+		return 0
+
+	case "show":
+		if len(args) != 2 {
+			fmt.Fprintln(stderr, "usage: bootwrangler library show <name>")
+			return 2
+		}
+		p, err := lib.Get(args[1])
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "name:       %s\n", p.Name)
+		fmt.Fprintf(stdout, "os_family:  %s\n", p.OS.Family)
+		fmt.Fprintf(stdout, "os_version: %s\n", p.OS.Version)
+		fmt.Fprintf(stdout, "hostname:   %s\n", p.System.Hostname)
+		fmt.Fprintf(stdout, "users:      %d\n", len(p.Users))
+		return 0
+
+	case "remove":
+		if len(args) != 2 {
+			fmt.Fprintln(stderr, "usage: bootwrangler library remove <name>")
+			return 2
+		}
+		if err := lib.Remove(args[1]); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "removed profile %q\n", args[1])
+		return 0
+
+	default:
+		fmt.Fprintf(stderr, "unknown library command %q\n", args[0])
+		return 2
+	}
 }
 
 func runRender(args []string, stdout, stderr io.Writer) int {
