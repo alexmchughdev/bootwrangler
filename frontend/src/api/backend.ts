@@ -10,10 +10,27 @@ export interface ValidationResult {
   problems: string[];
 }
 
+export interface ManifestFileEntry {
+  path: string;
+  purpose: string;
+  sha256: string;
+}
+
+export interface RenderManifest {
+  profile_name: string;
+  os_family: string;
+  os_version: string;
+  renderer: string;
+  files: ManifestFileEntry[];
+  warnings: string[];
+}
+
 interface AppService {
+  AvailableRenderers(): Promise<string[]>;
   Health(): Promise<HealthStatus>;
   LoadProfile(path: string): Promise<Profile>;
   OpenInNeovim(path: string, readOnly: boolean): Promise<void>;
+  RenderProfile(value: Profile, outDir: string): Promise<RenderManifest>;
   SaveProfile(path: string, value: Profile): Promise<void>;
   ValidateProfile(value: Profile): Promise<ValidationResult>;
   ValidateSSHPublicKey(value: string): Promise<ValidationResult>;
@@ -74,6 +91,19 @@ export async function validateSSHPublicKey(value: string): Promise<ValidationRes
     };
   }
   return service.ValidateSSHPublicKey(value);
+}
+
+export async function availableRenderers(): Promise<string[]> {
+  const service = getService();
+  if (!service) return [];
+  return service.AvailableRenderers();
+}
+
+export async function renderProfile(
+  value: Profile,
+  outDir: string,
+): Promise<RenderManifest> {
+  return requireService().RenderProfile(value, outDir);
 }
 
 function getService(): AppService | undefined {

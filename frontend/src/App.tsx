@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getHealth, type HealthStatus } from "./api/backend";
 import { navigationItems } from "./navigation";
 import ProfileEditor from "./pages/ProfileEditor";
+import RenderPreview from "./pages/RenderPreview";
 
 const initialHealth: HealthStatus = {
   status: "connecting",
@@ -66,7 +67,13 @@ function App() {
           </button>
         </header>
 
-        {activeSection === "Profiles" ? <ProfileEditor key={profileEditorKey} /> : <Dashboard />}
+        {activeSection === "Profiles" ? (
+          <ProfileEditor key={profileEditorKey} />
+        ) : activeSection === "Render" ? (
+          <RenderPreview />
+        ) : (
+          <Dashboard />
+        )}
       </section>
     </main>
   );
