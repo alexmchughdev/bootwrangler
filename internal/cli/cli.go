@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/alexmchughdev/bootwrangler/internal/editor"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
 	"github.com/alexmchughdev/bootwrangler/internal/version"
 )
@@ -46,17 +47,56 @@ func Run(args []string, stdout, stderr io.Writer) int {
 }
 
 func runProfile(args []string, stdout, stderr io.Writer) int {
-	if len(args) != 2 || args[0] != "validate" {
-		fmt.Fprintln(stderr, "usage: bootwrangler profile validate <profile.yaml>")
+	if len(args) == 0 {
+		printProfileUsage(stderr)
 		return 2
 	}
 
-	value, err := profile.LoadAndValidateFile(args[1])
-	if err != nil {
-		fmt.Fprintln(stderr, err)
-		return 1
+	switch args[0] {
+	case "edit":
+		path, err := parseProfileEditArgs(args[1:])
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		plan, err := editor.NeovimPlan(path, false)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if err := editor.Start(plan); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "opened profile in Neovim: %s\n", path)
+		return 0
+	case "validate":
+		if len(args) != 2 {
+			fmt.Fprintln(stderr, "usage: bootwrangler profile validate <profile.yaml>")
+			return 2
+		}
+		value, err := profile.LoadAndValidateFile(args[1])
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "profile valid: %s\n", value.Name)
+		return 0
+	default:
+		printProfileUsage(stderr)
+		return 2
 	}
+}
 
-	fmt.Fprintf(stdout, "profile valid: %s\n", value.Name)
-	return 0
+func parseProfileEditArgs(args []string) (string, error) {
+	if len(args) != 3 || args[1] != "--editor" || args[2] != "nvim" {
+		return "", fmt.Errorf("usage: bootwrangler profile edit <profile.yaml> --editor nvim")
+	}
+	return args[0], nil
+}
+
+func printProfileUsage(writer io.Writer) {
+	fmt.Fprintln(writer, "usage:")
+	fmt.Fprintln(writer, "  bootwrangler profile edit <profile.yaml> --editor nvim")
+	fmt.Fprintln(writer, "  bootwrangler profile validate <profile.yaml>")
 }

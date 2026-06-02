@@ -4,7 +4,11 @@ package app
 
 import (
 	"context"
+	"errors"
 
+	"github.com/alexmchughdev/bootwrangler/internal/editor"
+	"github.com/alexmchughdev/bootwrangler/internal/profile"
+	"github.com/alexmchughdev/bootwrangler/internal/secrets"
 	"github.com/alexmchughdev/bootwrangler/internal/version"
 )
 
@@ -12,6 +16,12 @@ import (
 type HealthStatus struct {
 	Status  string `json:"status"`
 	Version string `json:"version"`
+}
+
+// ValidationResult describes backend validation feedback for the GUI.
+type ValidationResult struct {
+	Valid    bool     `json:"valid"`
+	Problems []string `json:"problems"`
 }
 
 // Service exposes application operations to the desktop frontend.
@@ -35,5 +45,54 @@ func (s *Service) Health() HealthStatus {
 	return HealthStatus{
 		Status:  "ok",
 		Version: s.Version(),
+	}
+}
+
+// ValidateProfile validates one profile without side effects.
+func (s *Service) ValidateProfile(value profile.Profile) ValidationResult {
+	return validationResult(profile.Validate(value))
+}
+
+// ValidateSSHPublicKey validates one SSH public key without storing it.
+func (s *Service) ValidateSSHPublicKey(value string) ValidationResult {
+	return validationResult(secrets.ValidateSSHPublicKey(value))
+}
+
+// LoadProfile loads and validates one profile YAML file.
+func (s *Service) LoadProfile(path string) (profile.Profile, error) {
+	return profile.LoadAndValidateFile(path)
+}
+
+// SaveProfile validates and atomically saves one profile YAML file.
+func (s *Service) SaveProfile(path string, value profile.Profile) error {
+	return profile.SaveFile(path, value)
+}
+
+// OpenInNeovim opens one regular file in Neovim without shell interpolation.
+func (s *Service) OpenInNeovim(path string, readOnly bool) error {
+	plan, err := editor.NeovimPlan(path, readOnly)
+	if err != nil {
+		return err
+	}
+	return editor.Start(plan)
+}
+
+func validationResult(err error) ValidationResult {
+	if err == nil {
+		return ValidationResult{
+			Valid:    true,
+			Problems: []string{},
+		}
+	}
+
+	var validationError *profile.ValidationError
+	if errors.As(err, &validationError) {
+		return ValidationResult{
+			Problems: append([]string(nil), validationError.Problems...),
+		}
+	}
+
+	return ValidationResult{
+		Problems: []string{err.Error()},
 	}
 }

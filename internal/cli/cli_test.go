@@ -81,3 +81,25 @@ func TestRunProfileValidate(t *testing.T) {
 		t.Fatalf("Run() stderr = %q, want empty", stderr.String())
 	}
 }
+
+func TestParseProfileEditArgs(t *testing.T) {
+	t.Parallel()
+
+	path, err := parseProfileEditArgs([]string{"profile.yaml", "--editor", "nvim"})
+	if err != nil {
+		t.Fatalf("parseProfileEditArgs() error = %v, want nil", err)
+	}
+	if path != "profile.yaml" {
+		t.Fatalf("parseProfileEditArgs() path = %q, want %q", path, "profile.yaml")
+	}
+}
+
+func TestParseProfileEditArgsRejectsUnsupportedEditor(t *testing.T) {
+	t.Parallel()
+
+	_, err := parseProfileEditArgs([]string{"profile.yaml", "--editor", "vim"})
+
+	if err == nil {
+		t.Fatal("parseProfileEditArgs() error = nil, want error")
+	}
+}
