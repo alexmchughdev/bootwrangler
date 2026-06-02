@@ -54,6 +54,18 @@ func LoadFile(path string) (Profile, error) {
 	return result, nil
 }
 
+// LoadAndValidateBytes parses and validates a profile from a YAML byte slice.
+func LoadAndValidateBytes(data []byte) (Profile, error) {
+	result, err := Parse(data)
+	if err != nil {
+		return Profile{}, err
+	}
+	if err := Validate(result); err != nil {
+		return Profile{}, err
+	}
+	return result, nil
+}
+
 // LoadAndValidateFile parses and validates one profile YAML file.
 func LoadAndValidateFile(path string) (Profile, error) {
 	result, err := LoadFile(path)
