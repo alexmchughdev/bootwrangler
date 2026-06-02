@@ -495,3 +495,75 @@ p {
 .problem-list li {
   margin-bottom: 4px;
 }
+
+/* Profile library */
+.profile-library {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+}
+
+.library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.library-header h2 {
+  margin: 0;
+}
+
+.library-empty {
+  color: #5a7a9d;
+  font-size: 14px;
+}
+
+.library-table {
+  width: 100%;
+}
+
+.library-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.link-btn.danger {
+  color: #f87171;
+}
+
+.link-btn.danger:hover {
+  color: #fca5a5;
+}
+
+.library-import label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: #93afd4;
+}
+
+.import-row {
+  display: flex;
+  gap: 10px;
+}
+
+.import-row input {
+  flex: 1;
+}
+
+.secondary-action {
+  background: #1e3a5f;
+  border: 1px solid #2d5a8e;
+  border-radius: 6px;
+  color: #93c5fd;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 8px 16px;
+  white-space: nowrap;
+}
+
+.secondary-action:hover {
+  background: #2d5a8e;
+}

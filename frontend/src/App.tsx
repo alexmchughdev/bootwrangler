@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getHealth, type HealthStatus } from "./api/backend";
 import { navigationItems } from "./navigation";
 import ProfileEditor from "./pages/ProfileEditor";
+import ProfileLibrary from "./pages/ProfileLibrary";
 import RenderPreview from "./pages/RenderPreview";
 
 const initialHealth: HealthStatus = {
@@ -13,6 +14,7 @@ function App() {
   const [activeSection, setActiveSection] = useState("Dashboard");
   const [health, setHealth] = useState(initialHealth);
   const [profileEditorKey, setProfileEditorKey] = useState(0);
+  const [libraryKey, setLibraryKey] = useState(0);
 
   useEffect(() => {
     void getHealth().then(setHealth);
@@ -69,6 +71,14 @@ function App() {
 
         {activeSection === "Profiles" ? (
           <ProfileEditor key={profileEditorKey} />
+        ) : activeSection === "Library" ? (
+          <ProfileLibrary
+            key={libraryKey}
+            onOpen={(_profile, _filename) => {
+              setActiveSection("Profiles");
+              setProfileEditorKey((k) => k + 1);
+            }}
+          />
         ) : activeSection === "Render" ? (
           <RenderPreview />
         ) : (
