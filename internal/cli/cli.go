@@ -187,6 +187,48 @@ func runLibrary(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "removed profile %q\n", args[1])
 		return 0
 
+	case "export":
+		if len(args) < 2 {
+			fmt.Fprintln(stderr, "usage: bootwrangler library export <name> --out <file.zip>")
+			return 2
+		}
+		name := args[0]
+		outPath := name + ".zip"
+		for i := 1; i < len(args)-1; i++ {
+			if args[i] == "--out" {
+				outPath = args[i+1]
+			}
+		}
+		p, err := lib.Get(name)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if err := library.ExportBundle(p, outPath); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "exported %q to %s\n", name, outPath)
+		return 0
+
+	case "import":
+		if len(args) != 2 {
+			fmt.Fprintln(stderr, "usage: bootwrangler library import <file.zip>")
+			return 2
+		}
+		p, err := library.ImportBundle(args[1])
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		filename, err := lib.Add(p)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "imported profile %q as %s\n", p.Name, filename)
+		return 0
+
 	default:
 		fmt.Fprintf(stderr, "unknown library command %q\n", args[0])
 		return 2
