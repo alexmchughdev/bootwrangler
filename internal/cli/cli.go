@@ -6,6 +6,7 @@ import (
 
 	"github.com/alexmchughdev/bootwrangler/internal/editor"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
+	"github.com/alexmchughdev/bootwrangler/internal/render"
 	"github.com/alexmchughdev/bootwrangler/internal/version"
 )
 
@@ -16,6 +17,7 @@ Usage:
 
 Commands:
   profile     Manage provisioning profiles
+  render      Render a profile into unattended installer assets
   version     Print the BootWrangler version
 
 Options:
@@ -32,6 +34,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "profile":
 		return runProfile(args[1:], stdout, stderr)
+	case "render":
+		return runRender(args[1:], stdout, stderr)
 	case "version":
 		if len(args) != 1 {
 			fmt.Fprintln(stderr, "usage: bootwrangler version")
@@ -93,6 +97,61 @@ func parseProfileEditArgs(args []string) (string, error) {
 		return "", fmt.Errorf("usage: bootwrangler profile edit <profile.yaml> --editor nvim")
 	}
 	return args[0], nil
+}
+
+func runRender(args []string, stdout, stderr io.Writer) int {
+	outDir := "."
+	profilePath := ""
+
+	i := 0
+	for i < len(args) {
+		switch args[i] {
+		case "--out":
+			if i+1 >= len(args) {
+				fmt.Fprintln(stderr, "render: --out requires a directory argument")
+				return 2
+			}
+			outDir = args[i+1]
+			i += 2
+		default:
+			if profilePath != "" {
+				fmt.Fprintln(stderr, "render: unexpected argument:", args[i])
+				return 2
+			}
+			profilePath = args[i]
+			i++
+		}
+	}
+	if profilePath == "" {
+		fmt.Fprintln(stderr, "usage: bootwrangler render <profile.yaml> [--out <dir>]")
+		return 2
+	}
+
+	p, err := profile.LoadAndValidateFile(profilePath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	r, err := render.Lookup(p.OS.Family)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	opts := render.Options{OutDir: outDir}
+	m, err := r.Render(p, opts)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "rendered %s (%s %s) via %s renderer into %s\n",
+		m.ProfileName, m.OSFamily, m.OSVersion, m.Renderer, outDir)
+	for _, w := range m.Warnings {
+		fmt.Fprintf(stdout, "warning: %s\n", w)
+	}
+	return 0
 }
 
 func printProfileUsage(writer io.Writer) {
