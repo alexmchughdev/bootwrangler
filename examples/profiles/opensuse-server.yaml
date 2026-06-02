@@ -1,0 +1,52 @@
+name: opensuse-server
+
+os:
+  family: opensuse
+  version: "15.6"
+  architecture: x86_64
+
+system:
+  hostname: opensuse-server
+  timezone: Europe/London
+  keyboard: gb
+  locale: en_GB.UTF-8
+
+network:
+  mode: dhcp
+  interface: auto
+
+disk:
+  mode: wipe
+  target: auto
+  install_mode: server
+  filesystem: btrfs
+  confirm_destructive: true
+
+users:
+  - name: deploy
+    shell: /bin/bash
+    groups:
+      - wheel
+    sudo: true
+    ssh_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ0EkzLnXFTKfQXv2bseD0jLxoc+R6NxRHWqnY15T9i6 example-only@bootwrangler.invalid
+
+ssh:
+  enabled: true
+  permit_root_login: false
+  password_authentication: false
+
+packages:
+  presets:
+    - minimal
+  names:
+    - git
+
+services:
+  enable:
+    - sshd
+
+validation:
+  ssh:
+    enabled: true
+    user: deploy
