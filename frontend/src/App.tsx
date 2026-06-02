@@ -3,6 +3,7 @@ import { getHealth, type HealthStatus } from "./api/backend";
 import { navigationItems } from "./navigation";
 import ProfileEditor from "./pages/ProfileEditor";
 import ProfileLibrary from "./pages/ProfileLibrary";
+import ProvisioningServer from "./pages/ProvisioningServer";
 import RenderPreview from "./pages/RenderPreview";
 
 const initialHealth: HealthStatus = {
@@ -81,6 +82,8 @@ function App() {
           />
         ) : activeSection === "Render" ? (
           <RenderPreview />
+        ) : activeSection === "Provisioning Server" ? (
+          <ProvisioningServer />
         ) : (
           <Dashboard />
         )}
