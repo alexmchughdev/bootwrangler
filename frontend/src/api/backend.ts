@@ -1,10 +1,22 @@
+import type { Profile } from "../types/profile";
+
 export interface HealthStatus {
   status: string;
   version: string;
 }
 
+export interface ValidationResult {
+  valid: boolean;
+  problems: string[];
+}
+
 interface AppService {
   Health(): Promise<HealthStatus>;
+  LoadProfile(path: string): Promise<Profile>;
+  OpenInNeovim(path: string, readOnly: boolean): Promise<void>;
+  SaveProfile(path: string, value: Profile): Promise<void>;
+  ValidateProfile(value: Profile): Promise<ValidationResult>;
+  ValidateSSHPublicKey(value: string): Promise<ValidationResult>;
   Version(): Promise<string>;
 }
 
@@ -19,7 +31,7 @@ declare global {
 }
 
 export async function getHealth(): Promise<HealthStatus> {
-  const service = window.go?.app?.Service;
+  const service = getService();
   if (!service) {
     return {
       status: "preview",
@@ -28,4 +40,50 @@ export async function getHealth(): Promise<HealthStatus> {
   }
 
   return service.Health();
+}
+
+export async function loadProfile(path: string): Promise<Profile> {
+  return requireService().LoadProfile(path);
+}
+
+export async function openInNeovim(path: string): Promise<void> {
+  return requireService().OpenInNeovim(path, false);
+}
+
+export async function saveProfile(path: string, value: Profile): Promise<void> {
+  return requireService().SaveProfile(path, value);
+}
+
+export async function validateProfile(value: Profile): Promise<ValidationResult> {
+  const service = getService();
+  if (!service) {
+    return {
+      valid: false,
+      problems: ["Backend validation is unavailable in browser preview mode."],
+    };
+  }
+  return service.ValidateProfile(value);
+}
+
+export async function validateSSHPublicKey(value: string): Promise<ValidationResult> {
+  const service = getService();
+  if (!service) {
+    return {
+      valid: false,
+      problems: ["SSH key validation is unavailable in browser preview mode."],
+    };
+  }
+  return service.ValidateSSHPublicKey(value);
+}
+
+function getService(): AppService | undefined {
+  return window.go?.app?.Service;
+}
+
+function requireService(): AppService {
+  const service = getService();
+  if (!service) {
+    throw new Error("BootWrangler backend is unavailable.");
+  }
+  return service;
 }

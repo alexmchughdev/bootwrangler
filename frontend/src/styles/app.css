@@ -22,6 +22,28 @@ button {
   font: inherit;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid #284b70;
+  border-radius: 5px;
+  padding: 9px 10px;
+  color: #e0f2fe;
+  background: #0b1728;
+  font: inherit;
+}
+
+textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
 .app-shell {
   display: grid;
   min-height: 100vh;
@@ -161,6 +183,28 @@ p {
   cursor: pointer;
 }
 
+.secondary-action {
+  padding: 9px 12px;
+  border: 1px solid #2e567f;
+  border-radius: 5px;
+  color: #cce8ff;
+  background: #142b47;
+  cursor: pointer;
+}
+
+.text-action {
+  border: 0;
+  padding: 0;
+  color: #7dd3fc;
+  background: transparent;
+  cursor: pointer;
+}
+
+.text-action.danger,
+.inline-error {
+  color: #fda4af;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -185,4 +229,120 @@ p {
   margin: 18px 0 2px;
   color: #f8fafc;
   font-size: 30px;
+}
+
+.profile-editor,
+.editor-list {
+  display: grid;
+  gap: 16px;
+}
+
+.editor-toolbar {
+  display: grid;
+  min-height: auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(360px, 1.4fr);
+  gap: 16px;
+  align-items: end;
+}
+
+.toolbar-actions,
+.section-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+}
+
+.toolbar-actions {
+  grid-column: 1 / -1;
+}
+
+.section-header {
+  justify-content: space-between;
+}
+
+.path-field,
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.path-field span,
+.field > span,
+.checkbox-field span {
+  color: #9db5d3;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.validation-summary {
+  padding: 14px 16px;
+  border: 1px solid;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.validation-summary.valid {
+  border-color: #166534;
+  color: #86efac;
+  background: #0d251d;
+}
+
+.validation-summary.invalid {
+  border-color: #7f1d1d;
+  color: #fecaca;
+  background: #2a141b;
+}
+
+.validation-summary ul {
+  margin: 9px 0 0;
+  padding-left: 18px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.form-section {
+  min-height: auto;
+}
+
+.field-grid,
+.list-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+  margin-top: 17px;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.checkbox-field input {
+  width: auto;
+}
+
+.list-card {
+  display: grid;
+  gap: 14px;
+  padding: 15px;
+  border: 1px solid #284b70;
+  border-radius: 6px;
+  background: #0d1b2d;
+}
+
+.script-editor {
+  min-height: 150px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.inline-error {
+  display: block;
+  font-size: 12px;
 }

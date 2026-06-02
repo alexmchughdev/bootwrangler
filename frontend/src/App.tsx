@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getHealth, type HealthStatus } from "./api/backend";
 import { navigationItems } from "./navigation";
+import ProfileEditor from "./pages/ProfileEditor";
 
 const initialHealth: HealthStatus = {
   status: "connecting",
@@ -10,10 +11,16 @@ const initialHealth: HealthStatus = {
 function App() {
   const [activeSection, setActiveSection] = useState("Dashboard");
   const [health, setHealth] = useState(initialHealth);
+  const [profileEditorKey, setProfileEditorKey] = useState(0);
 
   useEffect(() => {
     void getHealth().then(setHealth);
   }, []);
+
+  function handleNewProfile() {
+    setActiveSection("Profiles");
+    setProfileEditorKey((value) => value + 1);
+  }
 
   return (
     <main className="app-shell">
@@ -54,11 +61,19 @@ function App() {
             <span className="eyebrow">BootWrangler Workspace</span>
             <h1>{activeSection}</h1>
           </div>
-          <button className="primary-action" type="button">
+          <button className="primary-action" onClick={handleNewProfile} type="button">
             New Profile
           </button>
         </header>
 
+        {activeSection === "Profiles" ? <ProfileEditor key={profileEditorKey} /> : <Dashboard />}
+      </section>
+    </main>
+  );
+}
+
+function Dashboard() {
+  return (
         <div className="dashboard-grid">
           <article className="panel panel-wide">
             <span className="panel-label">Workspace Status</span>
@@ -87,8 +102,6 @@ function App() {
             <p>No build root selected</p>
           </article>
         </div>
-      </section>
-    </main>
   );
 }
 
