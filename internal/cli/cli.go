@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/alexmchughdev/bootforge/internal/version"
+	"github.com/alexmchughdev/bootwrangler/internal/version"
 )
 
-const helpText = `BootForge is a GUI-first Linux provisioning and boot media studio.
+const helpText = `BootWrangler is a GUI-first Linux provisioning and boot media studio.
 
 Usage:
-  bootforge <command>
+  bootwrangler <command>
 
 Commands:
-  version     Print the BootForge version
+  version     Print the BootWrangler version
 
 Options:
   -h, --help  Show this help
@@ -29,14 +29,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "version":
 		if len(args) != 1 {
-			fmt.Fprintln(stderr, "usage: bootforge version")
+			fmt.Fprintln(stderr, "usage: bootwrangler version")
 			return 2
 		}
-		fmt.Fprintf(stdout, "BootForge %s\n", version.Current())
+		fmt.Fprintf(stdout, "BootWrangler %s\n", version.Current())
 		return 0
 	default:
 		fmt.Fprintf(stderr, "unknown command %q\n", args[0])
-		fmt.Fprintln(stderr, "run \"bootforge --help\" for usage")
+		fmt.Fprintln(stderr, "run \"bootwrangler --help\" for usage")
 		return 2
 	}
 }
