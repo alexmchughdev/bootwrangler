@@ -62,3 +62,22 @@ func TestRunUnknownCommand(t *testing.T) {
 		t.Fatalf("Run() stderr = %q, want unknown command error", stderr.String())
 	}
 }
+
+func TestRunProfileValidate(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run([]string{"profile", "validate", "../../examples/profiles/alpine-minimal.yaml"}, &stdout, &stderr)
+
+	if exitCode != 0 {
+		t.Fatalf("Run() exit code = %d, want 0; stderr = %q", exitCode, stderr.String())
+	}
+	if stdout.String() != "profile valid: alpine-minimal\n" {
+		t.Fatalf("Run() stdout = %q, want %q", stdout.String(), "profile valid: alpine-minimal\n")
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("Run() stderr = %q, want empty", stderr.String())
+	}
+}

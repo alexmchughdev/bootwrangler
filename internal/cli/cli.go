@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/alexmchughdev/bootwrangler/internal/profile"
 	"github.com/alexmchughdev/bootwrangler/internal/version"
 )
 
@@ -13,6 +14,7 @@ Usage:
   bootwrangler <command>
 
 Commands:
+  profile     Manage provisioning profiles
   version     Print the BootWrangler version
 
 Options:
@@ -27,6 +29,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	switch args[0] {
+	case "profile":
+		return runProfile(args[1:], stdout, stderr)
 	case "version":
 		if len(args) != 1 {
 			fmt.Fprintln(stderr, "usage: bootwrangler version")
@@ -39,4 +43,20 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "run \"bootwrangler --help\" for usage")
 		return 2
 	}
+}
+
+func runProfile(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 2 || args[0] != "validate" {
+		fmt.Fprintln(stderr, "usage: bootwrangler profile validate <profile.yaml>")
+		return 2
+	}
+
+	value, err := profile.LoadAndValidateFile(args[1])
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "profile valid: %s\n", value.Name)
+	return 0
 }

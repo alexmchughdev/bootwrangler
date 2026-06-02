@@ -70,4 +70,5 @@ scripts in Neovim as the first external editor integration.
 ```sh
 go run ./cmd/bootwrangler --help
 go run ./cmd/bootwrangler version
+go run ./cmd/bootwrangler profile validate ./examples/profiles/ubuntu-server.yaml
 ```
