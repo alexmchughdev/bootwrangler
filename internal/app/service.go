@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/alexmchughdev/bootwrangler/internal/editor"
+	"github.com/alexmchughdev/bootwrangler/internal/library"
 	"github.com/alexmchughdev/bootwrangler/internal/manifest"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
 	"github.com/alexmchughdev/bootwrangler/internal/render"
@@ -83,6 +84,36 @@ func (s *Service) RenderProfile(value profile.Profile, outDir string) (manifest.
 	}
 	opts := render.Options{OutDir: outDir}
 	return r.Render(value, opts)
+}
+
+// LibraryInit initialises the default BootWrangler workspace.
+func (s *Service) LibraryInit() error {
+	lib := library.New(library.DefaultDir())
+	return lib.Init()
+}
+
+// LibraryAdd validates and saves the profile to the local library.
+func (s *Service) LibraryAdd(value profile.Profile) (string, error) {
+	lib := library.New(library.DefaultDir())
+	return lib.Add(value)
+}
+
+// LibraryGet loads a profile by name from the local library.
+func (s *Service) LibraryGet(name string) (profile.Profile, error) {
+	lib := library.New(library.DefaultDir())
+	return lib.Get(name)
+}
+
+// LibraryList returns all profiles stored in the local library.
+func (s *Service) LibraryList() ([]library.Entry, error) {
+	lib := library.New(library.DefaultDir())
+	return lib.List()
+}
+
+// LibraryRemove deletes a profile from the local library by name.
+func (s *Service) LibraryRemove(name string) error {
+	lib := library.New(library.DefaultDir())
+	return lib.Remove(name)
 }
 
 // OpenInNeovim opens one regular file in Neovim without shell interpolation.
