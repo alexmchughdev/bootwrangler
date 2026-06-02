@@ -27,6 +27,22 @@ go.work.sum
 # env file
 .env
 
+# BootForge workspaces and generated artifacts
+.bootforge/
+build/
+dist/
+tmp/
+*.iso
+*.img
+*.raw
+*.qcow2
+
+# Frontend dependencies
+node_modules/
+
+# OS metadata
+.DS_Store
+
 # Editor/IDE
 # .idea/
 # .vscode/
