@@ -27,10 +27,13 @@ go.work.sum
 # env file
 .env
 
-# BootForge workspaces and generated artifacts
-.bootforge/
+# BootWrangler workspaces and generated artifacts
+.bootwrangler/
 build/
 dist/
+!frontend/dist/
+frontend/dist/*
+!frontend/dist/gitkeep
 tmp/
 *.iso
 *.img
@@ -39,6 +42,8 @@ tmp/
 
 # Frontend dependencies
 node_modules/
+frontend/package.json.md5
+frontend/wailsjs/
 
 # OS metadata
 .DS_Store

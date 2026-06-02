@@ -36,8 +36,8 @@ func TestRunVersion(t *testing.T) {
 	if exitCode != 0 {
 		t.Fatalf("Run() exit code = %d, want 0", exitCode)
 	}
-	if stdout.String() != "BootForge dev\n" {
-		t.Fatalf("Run() stdout = %q, want %q", stdout.String(), "BootForge dev\n")
+	if stdout.String() != "BootWrangler dev\n" {
+		t.Fatalf("Run() stdout = %q, want %q", stdout.String(), "BootWrangler dev\n")
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("Run() stderr = %q, want empty", stderr.String())

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/alexmchughdev/bootforge/internal/cli"
+	"github.com/alexmchughdev/bootwrangler/internal/cli"
 )
 
 func main() {
