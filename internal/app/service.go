@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/alexmchughdev/bootwrangler/internal/editor"
 	"github.com/alexmchughdev/bootwrangler/internal/library"
@@ -12,6 +13,7 @@ import (
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
 	"github.com/alexmchughdev/bootwrangler/internal/render"
 	"github.com/alexmchughdev/bootwrangler/internal/secrets"
+	"github.com/alexmchughdev/bootwrangler/internal/server"
 	"github.com/alexmchughdev/bootwrangler/internal/version"
 )
 
@@ -28,7 +30,10 @@ type ValidationResult struct {
 }
 
 // Service exposes application operations to the desktop frontend.
-type Service struct{}
+type Service struct {
+	mu  sync.Mutex
+	srv *server.Server
+}
 
 // NewService creates a desktop application service.
 func NewService() *Service {
@@ -114,6 +119,67 @@ func (s *Service) LibraryList() ([]library.Entry, error) {
 func (s *Service) LibraryRemove(name string) error {
 	lib := library.New(library.DefaultDir())
 	return lib.Remove(name)
+}
+
+// ServerStart starts the provisioning server serving root at addr.
+// It returns the actual listening address.
+func (s *Service) ServerStart(root, addr string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.srv != nil {
+		return "", errors.New("server is already running")
+	}
+	srv, err := server.New(root, addr)
+	if err != nil {
+		return "", err
+	}
+	if err := srv.Start(); err != nil {
+		return "", err
+	}
+	s.srv = srv
+	return srv.Addr(), nil
+}
+
+// ServerStop stops the running provisioning server.
+func (s *Service) ServerStop() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.srv == nil {
+		return nil
+	}
+	err := s.srv.Stop()
+	s.srv = nil
+	return err
+}
+
+// ServerAddr returns the address of the running server.
+func (s *Service) ServerAddr() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.srv == nil {
+		return ""
+	}
+	return s.srv.Addr()
+}
+
+// ServerLogs returns the request log of the running server.
+func (s *Service) ServerLogs() []server.RequestLog {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.srv == nil {
+		return nil
+	}
+	return s.srv.Logs()
+}
+
+// ServerEvents returns the install callback events of the running server.
+func (s *Service) ServerEvents() []server.CallbackEvent {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.srv == nil {
+		return nil
+	}
+	return s.srv.Events()
 }
 
 // OpenInNeovim opens one regular file in Neovim without shell interpolation.
