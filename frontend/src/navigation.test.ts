@@ -6,6 +6,7 @@ describe("navigationItems", () => {
     expect(navigationItems).toEqual([
       "Dashboard",
       "Profiles",
+      "Library",
       "Render",
       "Images",
       "Media Builder",

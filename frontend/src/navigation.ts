@@ -1,6 +1,7 @@
 export const navigationItems = [
   "Dashboard",
   "Profiles",
+  "Library",
   "Render",
   "Images",
   "Media Builder",
