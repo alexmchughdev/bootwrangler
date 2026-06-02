@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/alexmchughdev/bootwrangler/internal/cli"
+	_ "github.com/alexmchughdev/bootwrangler/internal/renderers/all"
 )
 
 func main() {

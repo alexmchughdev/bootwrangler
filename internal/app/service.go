@@ -7,7 +7,9 @@ import (
 	"errors"
 
 	"github.com/alexmchughdev/bootwrangler/internal/editor"
+	"github.com/alexmchughdev/bootwrangler/internal/manifest"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
+	"github.com/alexmchughdev/bootwrangler/internal/render"
 	"github.com/alexmchughdev/bootwrangler/internal/secrets"
 	"github.com/alexmchughdev/bootwrangler/internal/version"
 )
@@ -66,6 +68,21 @@ func (s *Service) LoadProfile(path string) (profile.Profile, error) {
 // SaveProfile validates and atomically saves one profile YAML file.
 func (s *Service) SaveProfile(path string, value profile.Profile) error {
 	return profile.SaveFile(path, value)
+}
+
+// AvailableRenderers returns the OS families for which a renderer is registered.
+func (s *Service) AvailableRenderers() []string {
+	return render.Families()
+}
+
+// RenderProfile renders one profile into outDir and returns the manifest.
+func (s *Service) RenderProfile(value profile.Profile, outDir string) (manifest.Manifest, error) {
+	r, err := render.Lookup(value.OS.Family)
+	if err != nil {
+		return manifest.Manifest{}, err
+	}
+	opts := render.Options{OutDir: outDir}
+	return r.Render(value, opts)
 }
 
 // OpenInNeovim opens one regular file in Neovim without shell interpolation.
