@@ -10,6 +10,7 @@ export const navigationItems = [
   "Lab",
   "Import",
   "USB Devices",
+  "Host Info",
   "Provisioning Server",
   "Settings",
 ] as const;

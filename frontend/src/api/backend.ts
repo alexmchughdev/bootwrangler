@@ -137,6 +137,30 @@ export interface ImportResult {
   Warnings: string[];
 }
 
+export interface CPUInfo {
+  Model: string;
+  Cores: number;
+  Threads: number;
+}
+
+export interface MemoryInfo {
+  TotalBytes: number;
+  TotalHuman: string;
+}
+
+export interface NetworkInterface {
+  Name: string;
+  Addresses: string[];
+  HWAddr: string;
+}
+
+export interface HostInfo {
+  Hostname: string;
+  CPU: CPUInfo;
+  Memory: MemoryInfo;
+  Interfaces: NetworkInterface[];
+}
+
 interface AppService {
   AvailableRenderers(): Promise<string[]>;
   Health(): Promise<HealthStatus>;
@@ -169,6 +193,7 @@ interface AppService {
   LabCreateSnapshot(runID: string, name: string): Promise<void>;
   ImportConfig(content: string): Promise<ImportResult>;
   DetectConfigFormat(content: string): Promise<string>;
+  GatherHostInfo(): Promise<HostInfo>;
 }
 
 declare global {
@@ -358,6 +383,19 @@ export async function detectConfigFormat(content: string): Promise<string> {
   const service = getService();
   if (!service) return "unknown";
   return service.DetectConfigFormat(content);
+}
+
+export async function gatherHostInfo(): Promise<HostInfo> {
+  const service = getService();
+  if (!service) {
+    return {
+      Hostname: "preview-mode",
+      CPU: { Model: "Unknown (backend not available)", Cores: 0, Threads: 0 },
+      Memory: { TotalBytes: 0, TotalHuman: "—" },
+      Interfaces: [],
+    };
+  }
+  return service.GatherHostInfo();
 }
 
 function getService(): AppService | undefined {
