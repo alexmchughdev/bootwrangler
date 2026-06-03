@@ -1,0 +1,8 @@
+require_ssh_key_only: true
+forbid_root_login: true
+require_disk_confirm: true
+allowed_distros:
+  - ubuntu
+  - debian
+  - rocky
+min_users: 1
