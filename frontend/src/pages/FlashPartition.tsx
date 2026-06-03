@@ -9,7 +9,7 @@ import {
   imageCacheStatus,
   listDevices,
   listImages,
-  planPartitionFlash,
+  planCataloguePartitionFlash,
 } from "../api/backend";
 
 // ---------------------------------------------------------------------------
@@ -20,7 +20,6 @@ interface SelectedImage {
   entry: CatalogueEntry;
   version: string;
   arch: string;
-  imagePath: string;
 }
 
 interface PartitionTarget {
@@ -232,7 +231,6 @@ function SelectImageStep({ onNext }: SelectImageStepProps) {
                   (img) => img.Compatibility.Partition,
                 );
                 if (partitionImages.length === 0) return null;
-                const firstImg = partitionImages[0];
                 const key = cacheKey(entry.ID, ver.Version, archEntry.Arch);
                 const status = cacheMap[key];
                 const rowKey = `${entry.ID}/${ver.Version}/${archEntry.Arch}`;
@@ -256,7 +254,6 @@ function SelectImageStep({ onNext }: SelectImageStepProps) {
                         entry,
                         version: ver.Version,
                         arch: archEntry.Arch,
-                        imagePath: firstImg.URL,
                       })
                     }
                   >
@@ -365,7 +362,13 @@ function SelectPartitionStep({
     setPlanError("");
     setPlanning(true);
     try {
-      const p = await planPartitionFlash(target.device.Path, target.partition.Path, selectedImage.imagePath);
+      const p = await planCataloguePartitionFlash(
+        target.device.Path,
+        target.partition.Path,
+        selectedImage.entry.ID,
+        selectedImage.version,
+        selectedImage.arch,
+      );
       setPlan(p);
     } catch (err) {
       setPlanError(String(err));

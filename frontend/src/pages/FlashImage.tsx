@@ -8,7 +8,7 @@ import {
   imageCacheStatus,
   listDevices,
   listImages,
-  planFlash,
+  planCatalogueFlash,
 } from "../api/backend";
 
 // ---------------------------------------------------------------------------
@@ -19,7 +19,6 @@ interface SelectedImage {
   entry: CatalogueEntry;
   version: string;
   arch: string;
-  imagePath: string;
 }
 
 type Step = "select-image" | "select-device" | "confirm";
@@ -208,7 +207,6 @@ function SelectImageStep({ onNext }: SelectImageStepProps) {
                   (img) => img.Compatibility.WholeDrive,
                 );
                 if (wholeDriveImages.length === 0) return null;
-                const firstImg = wholeDriveImages[0];
                 const key = cacheKey(entry.ID, ver.Version, archEntry.Arch);
                 const status = cacheMap[key];
                 const rowKey = `${entry.ID}/${ver.Version}/${archEntry.Arch}`;
@@ -232,7 +230,6 @@ function SelectImageStep({ onNext }: SelectImageStepProps) {
                         entry,
                         version: ver.Version,
                         arch: archEntry.Arch,
-                        imagePath: firstImg.URL,
                       })
                     }
                   >
@@ -332,7 +329,12 @@ function SelectDeviceStep({ selectedImage, onBack, onNext }: SelectDeviceStepPro
     setPlanError("");
     setPlanning(true);
     try {
-      const p = await planFlash(device.Path, selectedImage.imagePath);
+      const p = await planCatalogueFlash(
+        device.Path,
+        selectedImage.entry.ID,
+        selectedImage.version,
+        selectedImage.arch,
+      );
       setPlan(p);
     } catch (err) {
       setPlanError(String(err));

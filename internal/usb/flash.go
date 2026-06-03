@@ -57,15 +57,9 @@ func PlanFlash(dev Device, imagePath string, dryRun bool) (FlashPlan, error) {
 	}, nil
 }
 
-// checkPartitionImageCompatibility is a placeholder for future compatibility
-// checks between an image and a target partition. Callers must verify
-// compatibility for their specific use case.
-func checkPartitionImageCompatibility(_ Partition, _ string) error {
-	// Accept any image for partition flash — callers must check compatibility.
-	return nil
-}
-
 // PlanPartitionFlash validates flashing an image to a specific partition.
+// Catalogue image compatibility must be checked by callers before reaching
+// this local-file planner.
 func PlanPartitionFlash(dev Device, partition Partition, imagePath string, dryRun bool) (FlashPlan, error) {
 	if !dev.Safe {
 		return FlashPlan{}, fmt.Errorf("unsafe device: %s", dev.SafetyNote)
@@ -83,10 +77,6 @@ func PlanPartitionFlash(dev Device, partition Partition, imagePath string, dryRu
 	imageSize := info.Size()
 	if imageSize > partition.Size {
 		return FlashPlan{}, fmt.Errorf("image size (%d) exceeds partition capacity (%d)", imageSize, partition.Size)
-	}
-
-	if err := checkPartitionImageCompatibility(partition, imagePath); err != nil {
-		return FlashPlan{}, err
 	}
 
 	cmd := fmt.Sprintf("dd if=%s of=%s bs=4M status=progress", imagePath, partition.Path)

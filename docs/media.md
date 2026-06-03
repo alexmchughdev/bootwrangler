@@ -42,6 +42,18 @@ bootwrangler recipe plan my-usb.yaml --device /dev/sdb
 
 This prints the partition layout and copy actions without writing anything.
 
+## Image flash compatibility
+
+Catalogue images declare the modes they support:
+
+- `whole_drive`: write the image to an entire USB/disk.
+- `partition`: write the image directly to a selected partition.
+- `iso_file_boot`: store the ISO as a file and boot it from a menu.
+
+The desktop flash workflows resolve catalogue metadata before planning. If an
+image is whole-drive only, partition flashing is rejected; use whole-drive flash
+or ISO-file boot mode instead.
+
 ## Contained provisioning mode
 
 Rendered installer assets can be written directly to a mounted USB partition so the machine boots and installs without a network provisioning server:

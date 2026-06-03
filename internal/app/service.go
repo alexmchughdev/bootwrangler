@@ -336,6 +336,23 @@ func (s *Service) PlanFlash(devicePath, imagePath string) (usb.FlashPlan, error)
 	return usb.FlashPlan{}, fmt.Errorf("device not found: %s", devicePath)
 }
 
+// PlanCatalogueFlash validates flashing a cached catalogue image to a whole device.
+func (s *Service) PlanCatalogueFlash(devicePath, id, version, arch string) (usb.FlashPlan, error) {
+	cat := images.BuiltinCatalogue()
+	_, _, _, img, err := images.FindImage(cat, id, version, arch)
+	if err != nil {
+		return usb.FlashPlan{}, err
+	}
+	if err := images.RequireWholeDriveCompatible(id, version, img); err != nil {
+		return usb.FlashPlan{}, err
+	}
+	imagePath, err := cachedImagePath(id, version, arch, img)
+	if err != nil {
+		return usb.FlashPlan{}, err
+	}
+	return s.PlanFlash(devicePath, imagePath)
+}
+
 // PlanPartitionFlash validates flashing an image to a specific partition.
 func (s *Service) PlanPartitionFlash(devicePath, partitionPath, imagePath string) (usb.FlashPlan, error) {
 	devices, err := usb.ListDevices()
@@ -356,6 +373,23 @@ func (s *Service) PlanPartitionFlash(devicePath, partitionPath, imagePath string
 	return usb.FlashPlan{}, fmt.Errorf("device not found: %s", devicePath)
 }
 
+// PlanCataloguePartitionFlash validates flashing a cached catalogue image to a selected partition.
+func (s *Service) PlanCataloguePartitionFlash(devicePath, partitionPath, id, version, arch string) (usb.FlashPlan, error) {
+	cat := images.BuiltinCatalogue()
+	_, _, _, img, err := images.FindImage(cat, id, version, arch)
+	if err != nil {
+		return usb.FlashPlan{}, err
+	}
+	if err := images.RequirePartitionCompatible(id, version, img); err != nil {
+		return usb.FlashPlan{}, err
+	}
+	imagePath, err := cachedImagePath(id, version, arch, img)
+	if err != nil {
+		return usb.FlashPlan{}, err
+	}
+	return s.PlanPartitionFlash(devicePath, partitionPath, imagePath)
+}
+
 // ExecuteFlash runs a previously validated flash plan.
 // Returns error if device is no longer safe at execution time.
 func (s *Service) ExecuteFlash(plan usb.FlashPlan) error {
@@ -372,6 +406,15 @@ func (s *Service) ExecuteFlash(plan usb.FlashPlan) error {
 		}
 	}
 	return fmt.Errorf("device not found: %s", plan.DevicePath)
+}
+
+func cachedImagePath(id, version, arch string, img images.ArchImage) (string, error) {
+	status := images.CheckCache(images.CacheDir(), id, version, arch, img)
+	if !status.Cached {
+		return "", fmt.Errorf("image %s is not cached; download and verify it before flashing",
+			images.ImageName(id, version))
+	}
+	return status.Path, nil
 }
 
 // PlanMediaBuild parses the recipe YAML, looks up the device size, and returns a BuildPlan.

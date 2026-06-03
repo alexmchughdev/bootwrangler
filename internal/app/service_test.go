@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
@@ -158,5 +159,34 @@ func TestServiceLibraryVersioning(t *testing.T) {
 	}
 	if entries[0].Message != "initial version" {
 		t.Fatalf("LibraryHistory()[0].Message = %q, want %q", entries[0].Message, "initial version")
+	}
+}
+
+func TestServicePlanCataloguePartitionFlashRejectsIncompatibleImageBeforeDeviceProbe(t *testing.T) {
+	t.Parallel()
+
+	svc := NewService()
+
+	_, err := svc.PlanCataloguePartitionFlash("/dev/sdb", "/dev/sdb1", "ubuntu-server", "24.04", "x86_64")
+	if err == nil {
+		t.Fatal("PlanCataloguePartitionFlash() error = nil, want compatibility error")
+	}
+	if !strings.Contains(err.Error(), "not marked as partition-flash compatible") {
+		t.Fatalf("PlanCataloguePartitionFlash() error = %q, want partition compatibility message", err.Error())
+	}
+}
+
+func TestServicePlanCatalogueFlashRequiresCachedImageBeforeDeviceProbe(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	svc := NewService()
+
+	_, err := svc.PlanCatalogueFlash("/dev/sdb", "ubuntu-server", "24.04", "x86_64")
+	if err == nil {
+		t.Fatal("PlanCatalogueFlash() error = nil, want cache error")
+	}
+	if !strings.Contains(err.Error(), "is not cached") {
+		t.Fatalf("PlanCatalogueFlash() error = %q, want cache message", err.Error())
 	}
 }

@@ -1,6 +1,7 @@
 package images
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -114,6 +115,55 @@ func TestFindImage_NotFound(t *testing.T) {
 	_, _, _, _, err = FindImage(cat, "nonexistent", "", "")
 	if err == nil {
 		t.Error("expected error for missing image")
+	}
+}
+
+func TestRequirePartitionCompatibleRejectsWholeDriveOnlyImage(t *testing.T) {
+	img := ArchImage{
+		Compatibility: Compatibility{
+			WholeDrive:  true,
+			Partition:   false,
+			ISOFileBoot: true,
+		},
+	}
+
+	err := RequirePartitionCompatible("ubuntu-server", "24.04", img)
+	if err == nil {
+		t.Fatal("RequirePartitionCompatible() error = nil, want error")
+	}
+	want := "image ubuntu-server-24.04 is not marked as partition-flash compatible"
+	if got := err.Error(); !strings.HasPrefix(got, want) {
+		t.Fatalf("RequirePartitionCompatible() error = %q, want prefix %q", got, want)
+	}
+}
+
+func TestRequirePartitionCompatibleAllowsMarkedImage(t *testing.T) {
+	img := ArchImage{
+		Compatibility: Compatibility{
+			Partition: true,
+		},
+	}
+
+	if err := RequirePartitionCompatible("company-os", "1.0", img); err != nil {
+		t.Fatalf("RequirePartitionCompatible() error = %v, want nil", err)
+	}
+}
+
+func TestRequireWholeDriveCompatibleRejectsPartitionOnlyImage(t *testing.T) {
+	img := ArchImage{
+		Compatibility: Compatibility{
+			WholeDrive: false,
+			Partition:  true,
+		},
+	}
+
+	err := RequireWholeDriveCompatible("partition-os", "1.0", img)
+	if err == nil {
+		t.Fatal("RequireWholeDriveCompatible() error = nil, want error")
+	}
+	want := "image partition-os-1.0 is not marked as whole-drive compatible"
+	if got := err.Error(); !strings.HasPrefix(got, want) {
+		t.Fatalf("RequireWholeDriveCompatible() error = %q, want prefix %q", got, want)
 	}
 }
 

@@ -89,6 +89,34 @@ func FindImage(cat Catalogue, id, version, arch string) (CatalogueEntry, Version
 		fmt.Errorf("image not found: id=%s version=%s arch=%s", id, version, arch)
 }
 
+// ImageName formats the stable image identifier used in errors and reports.
+func ImageName(id, version string) string {
+	if version == "" {
+		return id
+	}
+	return id + "-" + version
+}
+
+// RequireWholeDriveCompatible rejects catalogue images that cannot be flashed
+// to a whole device.
+func RequireWholeDriveCompatible(id, version string, img ArchImage) error {
+	if img.Compatibility.WholeDrive {
+		return nil
+	}
+	return fmt.Errorf("image %s is not marked as whole-drive compatible; use partition flash, ISO-file boot mode, or another image",
+		ImageName(id, version))
+}
+
+// RequirePartitionCompatible rejects catalogue images that cannot be flashed
+// directly to a partition.
+func RequirePartitionCompatible(id, version string, img ArchImage) error {
+	if img.Compatibility.Partition {
+		return nil
+	}
+	return fmt.Errorf("image %s is not marked as partition-flash compatible; use whole-drive flash or ISO-file boot mode",
+		ImageName(id, version))
+}
+
 // BuiltinCatalogue returns the built-in catalogue of official OS images.
 // Data is sourced from the embedded catalogue.yaml, which is updated by the
 // update-catalogue GitHub Action to keep URLs current.

@@ -220,7 +220,15 @@ interface AppService {
   LoadProfile(path: string): Promise<Profile>;
   OpenInNeovim(path: string, readOnly: boolean): Promise<void>;
   PlanFlash(devicePath: string, imagePath: string): Promise<FlashPlan>;
+  PlanCatalogueFlash(devicePath: string, id: string, version: string, arch: string): Promise<FlashPlan>;
   PlanPartitionFlash(devicePath: string, partitionPath: string, imagePath: string): Promise<FlashPlan>;
+  PlanCataloguePartitionFlash(
+    devicePath: string,
+    partitionPath: string,
+    id: string,
+    version: string,
+    arch: string,
+  ): Promise<FlashPlan>;
   ExecuteFlash(plan: FlashPlan): Promise<void>;
   PlanMediaBuild(recipeYAML: string, devicePath: string): Promise<BuildPlan>;
   FormatMediaBuildPlan(plan: BuildPlan): Promise<string>;
@@ -376,12 +384,37 @@ export async function planFlash(
   return requireService().PlanFlash(devicePath, imagePath);
 }
 
+export async function planCatalogueFlash(
+  devicePath: string,
+  id: string,
+  version: string,
+  arch: string,
+): Promise<FlashPlan> {
+  return requireService().PlanCatalogueFlash(devicePath, id, version, arch);
+}
+
 export async function planPartitionFlash(
   devicePath: string,
   partitionPath: string,
   imagePath: string,
 ): Promise<FlashPlan> {
   return requireService().PlanPartitionFlash(devicePath, partitionPath, imagePath);
+}
+
+export async function planCataloguePartitionFlash(
+  devicePath: string,
+  partitionPath: string,
+  id: string,
+  version: string,
+  arch: string,
+): Promise<FlashPlan> {
+  return requireService().PlanCataloguePartitionFlash(
+    devicePath,
+    partitionPath,
+    id,
+    version,
+    arch,
+  );
 }
 
 export async function executeFlash(plan: FlashPlan): Promise<void> {
