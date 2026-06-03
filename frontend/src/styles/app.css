@@ -921,6 +921,12 @@ p {
   background: #0d251d;
 }
 
+.cache-badge--unverified {
+  border: 1px solid #92400e;
+  color: #fbbf24;
+  background: #251804;
+}
+
 .cache-badge--missing {
   border: 1px solid #44403c;
   color: #a8a29e;

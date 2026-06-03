@@ -15,8 +15,46 @@ interface VersionArchKey {
 
 type CacheMap = Record<string, CacheStatus>;
 
+interface CacheStatusPresentation {
+  className: string;
+  label: string;
+  showDownload: boolean;
+  downloadLabel: string;
+  downloadingLabel: string;
+}
+
 function cacheKey(id: string, version: string, arch: string): string {
   return `${id}/${version}/${arch}`;
+}
+
+function cacheStatusPresentation(status: CacheStatus): CacheStatusPresentation {
+  if (!status.Cached) {
+    return {
+      className: "cache-badge cache-badge--missing",
+      label: "Not downloaded",
+      showDownload: true,
+      downloadLabel: "Download",
+      downloadingLabel: "Downloading…",
+    };
+  }
+
+  if (!status.Verified) {
+    return {
+      className: "cache-badge cache-badge--unverified",
+      label: "Downloaded, not verified",
+      showDownload: true,
+      downloadLabel: "Download & verify",
+      downloadingLabel: "Verifying…",
+    };
+  }
+
+  return {
+    className: "cache-badge cache-badge--cached",
+    label: "Verified",
+    showDownload: false,
+    downloadLabel: "",
+    downloadingLabel: "",
+  };
 }
 
 export default function Images() {
@@ -151,6 +189,8 @@ export default function Images() {
                       {ver.Architectures.map((archEntry) => {
                         const key = cacheKey(entry.ID, ver.Version, archEntry.Arch);
                         const status = cacheMap[key];
+                        const statusPresentation =
+                          status !== undefined ? cacheStatusPresentation(status) : undefined;
                         const firstImg = archEntry.Images[0];
                         const isDownloading = !!downloading[key];
                         const dlError = downloadErrors[key];
@@ -158,15 +198,9 @@ export default function Images() {
                           <div className="image-arch-entry" key={archEntry.Arch}>
                             <span className="image-arch-badge">{archEntry.Arch}</span>
 
-                            {status !== undefined ? (
-                              <span
-                                className={
-                                  status.Cached
-                                    ? "cache-badge cache-badge--cached"
-                                    : "cache-badge cache-badge--missing"
-                                }
-                              >
-                                {status.Cached ? "Downloaded" : "Not cached"}
+                            {statusPresentation !== undefined ? (
+                              <span className={statusPresentation.className}>
+                                {statusPresentation.label}
                               </span>
                             ) : (
                               <span className="cache-badge cache-badge--unknown">
@@ -193,7 +227,7 @@ export default function Images() {
                               </div>
                             )}
 
-                            {!status?.Cached && (
+                            {statusPresentation?.showDownload && (
                               <button
                                 className="secondary-action image-download-btn"
                                 disabled={isDownloading}
@@ -202,7 +236,9 @@ export default function Images() {
                                 }
                                 type="button"
                               >
-                                {isDownloading ? "Downloading…" : "Download"}
+                                {isDownloading
+                                  ? statusPresentation.downloadingLabel
+                                  : statusPresentation.downloadLabel}
                               </button>
                             )}
 

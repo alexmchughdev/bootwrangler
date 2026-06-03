@@ -526,7 +526,7 @@ func runImages(args []string, stdout, stderr io.Writer) int {
 		destPath := images.CachedPath(cacheDir, id, version, arch, img)
 		fmt.Fprintf(stdout, "downloading %s → %s\n", img.URL, destPath)
 		var lastPct int64
-		if err := images.Download(img.URL, destPath, func(written, total int64) {
+		if err := images.DownloadAndVerify(img, destPath, func(written, total int64) {
 			if total <= 0 {
 				return
 			}
@@ -538,6 +538,11 @@ func runImages(args []string, stdout, stderr io.Writer) int {
 		}); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
+		}
+		status := images.CheckCache(cacheDir, id, version, arch, img)
+		if status.Verified {
+			fmt.Fprintf(stdout, "done: verified %s\n", destPath)
+			return 0
 		}
 		fmt.Fprintf(stdout, "done: %s\n", destPath)
 		return 0

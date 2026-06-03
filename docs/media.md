@@ -54,6 +54,22 @@ The desktop flash workflows resolve catalogue metadata before planning. If an
 image is whole-drive only, partition flashing is rejected; use whole-drive flash
 or ISO-file boot mode instead.
 
+## Image download verification
+
+Catalogue downloads use checksum metadata when the image entry provides it. The
+download flow stores a verified cache marker only after the image bytes match
+the expected SHA256 checksum.
+
+Cache states shown in the desktop image catalogue:
+
+- `Not downloaded`: no cached image is present.
+- `Downloaded, not verified`: a cached image exists without a verified checksum
+  marker.
+- `Verified`: the image was downloaded and matched its SHA256 checksum.
+
+Checksum failures remove the newly downloaded image and any stale verification
+marker so flashing workflows do not treat an unverified image as safe.
+
 ## Contained provisioning mode
 
 Rendered installer assets can be written directly to a mounted USB partition so the machine boots and installs without a network provisioning server:

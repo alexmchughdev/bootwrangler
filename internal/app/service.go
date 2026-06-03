@@ -297,7 +297,7 @@ func (s *Service) DownloadImage(id, version, arch string) (string, error) {
 	}
 	cacheDir := images.CacheDir()
 	destPath := images.CachedPath(cacheDir, id, version, arch, img)
-	if err := images.Download(img.URL, destPath, nil); err != nil {
+	if err := images.DownloadAndVerify(img, destPath, nil); err != nil {
 		return "", fmt.Errorf("download failed: %w", err)
 	}
 	return destPath, nil
