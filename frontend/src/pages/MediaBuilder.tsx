@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { formatMediaBuildPlan, listDevices, planMediaBuild } from "../api/backend";
+import { formatMediaBuildPlan, listDevices, planMediaBuild, readRenderedFile, writeTextFile } from "../api/backend";
 
 const YAML_PLACEHOLDER = `# Recipe YAML format:
 # label: my-usb-stick
@@ -29,6 +29,9 @@ export default function MediaBuilder() {
   const [yaml, setYaml] = useState("");
   const [devicePath, setDevicePath] = useState("/dev/sdb");
   const [plan, setPlan] = useState<PlanState>({ kind: "idle" });
+  const [recipeSavePath, setRecipeSavePath] = useState("");
+  const [recipeLoadPath, setRecipeLoadPath] = useState("");
+  const [recipeSaved, setRecipeSaved] = useState(false);
 
   async function handleValidate() {
     if (yaml.trim() === "") {
@@ -50,6 +53,28 @@ export default function MediaBuilder() {
       setPlan({ kind: "plan", text });
     } catch (err) {
       setPlan({ kind: "error", message: String(err) });
+    }
+  }
+
+  async function handleSaveRecipe() {
+    if (!recipeSavePath.trim() || !yaml.trim()) return;
+    try {
+      await writeTextFile(recipeSavePath.trim(), yaml);
+      setRecipeSaved(true);
+      setTimeout(() => setRecipeSaved(false), 2000);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function handleLoadRecipe() {
+    if (!recipeLoadPath.trim()) return;
+    try {
+      const content = await readRenderedFile(recipeLoadPath.trim());
+      setYaml(content);
+      setRecipeLoadPath("");
+    } catch {
+      // ignore
     }
   }
 
@@ -128,6 +153,28 @@ export default function MediaBuilder() {
                 Clear
               </button>
             )}
+          </div>
+          <div className="media-builder-file-row">
+            <input
+              type="text"
+              placeholder="Load recipe from path…"
+              value={recipeLoadPath}
+              onChange={(e) => setRecipeLoadPath(e.target.value)}
+            />
+            <button className="link-btn" type="button" onClick={() => void handleLoadRecipe()} disabled={!recipeLoadPath.trim()}>
+              Load
+            </button>
+          </div>
+          <div className="media-builder-file-row">
+            <input
+              type="text"
+              placeholder="Save recipe to path…"
+              value={recipeSavePath}
+              onChange={(e) => setRecipeSavePath(e.target.value)}
+            />
+            <button className="link-btn" type="button" onClick={() => void handleSaveRecipe()} disabled={!recipeSavePath.trim() || !yaml.trim()}>
+              {recipeSaved ? "Saved!" : "Save"}
+            </button>
           </div>
         </div>
 

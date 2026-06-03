@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   labCreateSnapshot,
+  labDeleteSnapshot,
   labListRuns,
   labListSnapshots,
+  labRevertSnapshot,
   labSSHCommand,
   labSerialLog,
   labStart,
@@ -10,8 +12,17 @@ import {
   type LabRun,
 } from "../api/backend";
 
+const LS_LAB_PROFILE = "bw_lab_profile_name";
+
 export default function Lab() {
-  const [profile, setProfile] = useState("");
+  const [profile, setProfile] = useState(() => {
+    const saved = localStorage.getItem(LS_LAB_PROFILE);
+    if (saved) {
+      localStorage.removeItem(LS_LAB_PROFILE);
+      return saved;
+    }
+    return "";
+  });
   const [memory, setMemory] = useState("2048");
   const [cpus, setCpus] = useState("2");
   const [activeRuns, setActiveRuns] = useState<LabRun[]>([]);
@@ -19,16 +30,27 @@ export default function Lab() {
   const [selectedRunID, setSelectedRunID] = useState<string | null>(null);
   const [consoleLog, setConsoleLog] = useState("");
   const [snapshotNames, setSnapshotNames] = useState<Record<string, string>>({});
+  const [copiedRunID, setCopiedRunID] = useState<string | null>(null);
   const [snapshotLists, setSnapshotLists] = useState<Record<string, string[]>>({});
   const consoleRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const refreshRuns = useCallback(async () => {
+    try {
+      const runs = await labListRuns();
+      setActiveRuns(runs);
+    } catch {
+      // silent poll failures
+    }
+  }, []);
 
   useEffect(() => {
-    labListRuns()
-      .then(setActiveRuns)
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : String(err));
-      });
-  }, []);
+    void refreshRuns();
+    pollRef.current = setInterval(() => void refreshRuns(), 5000);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [refreshRuns]);
 
   async function handleStart() {
     setError("");
@@ -80,9 +102,20 @@ export default function Lab() {
     try {
       const cmd = await labSSHCommand(runID, "root");
       await navigator.clipboard.writeText(cmd);
+      setCopiedRunID(runID);
+      setTimeout(() => setCopiedRunID((prev) => (prev === runID ? null : prev)), 2000);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  async function handleCopyVNC(run: LabRun) {
+    await navigator.clipboard.writeText(`localhost:${run.VNCPort}`);
+    setCopiedRunID(`vnc-${run.ID}`);
+    setTimeout(
+      () => setCopiedRunID((prev) => (prev === `vnc-${run.ID}` ? null : prev)),
+      2000,
+    );
   }
 
   async function handleCreateSnapshot(runID: string) {
@@ -103,6 +136,27 @@ export default function Lab() {
   async function handleListSnapshots(runID: string) {
     setError("");
     try {
+      const snaps = await labListSnapshots(runID);
+      setSnapshotLists((prev) => ({ ...prev, [runID]: snaps }));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleRevertSnapshot(runID: string, snap: string) {
+    setError("");
+    try {
+      await labRevertSnapshot(runID, snap);
+      setError(`Reverted to snapshot "${snap}"`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleDeleteSnapshot(runID: string, snap: string) {
+    setError("");
+    try {
+      await labDeleteSnapshot(runID, snap);
       const snaps = await labListSnapshots(runID);
       setSnapshotLists((prev) => ({ ...prev, [runID]: snaps }));
     } catch (err: unknown) {
@@ -239,7 +293,15 @@ sudo pacman -S qemu-full`}</pre>
                         onClick={() => void handleSSHCommand(run.ID)}
                         title="Copy SSH command to clipboard"
                       >
-                        SSH Command
+                        {copiedRunID === run.ID ? "Copied!" : "SSH Command"}
+                      </button>
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        onClick={() => void handleCopyVNC(run)}
+                        title="Copy VNC address"
+                      >
+                        {copiedRunID === `vnc-${run.ID}` ? "Copied!" : "Copy VNC"}
                       </button>
                     </div>
                     <div className="lab-snapshot-section">
@@ -277,8 +339,22 @@ sudo pacman -S qemu-full`}</pre>
                             <li className="library-empty">No snapshots.</li>
                           ) : (
                             snapshotLists[run.ID].map((snap) => (
-                              <li key={snap}>
+                              <li key={snap} className="lab-snapshot-item">
                                 <code className="inline-code">{snap}</code>
+                                <button
+                                  type="button"
+                                  className="link-btn"
+                                  onClick={() => void handleRevertSnapshot(run.ID, snap)}
+                                >
+                                  Revert
+                                </button>
+                                <button
+                                  type="button"
+                                  className="link-btn danger"
+                                  onClick={() => void handleDeleteSnapshot(run.ID, snap)}
+                                >
+                                  Delete
+                                </button>
                               </li>
                             ))
                           )}

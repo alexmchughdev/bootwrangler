@@ -229,6 +229,7 @@ func runLabSnapshot(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "  bootwrangler lab snapshot create <run-id> <name>")
 		fmt.Fprintln(stderr, "  bootwrangler lab snapshot list   <run-id>")
 		fmt.Fprintln(stderr, "  bootwrangler lab snapshot revert <run-id> <name>")
+		fmt.Fprintln(stderr, "  bootwrangler lab snapshot delete <run-id> <name>")
 		return 2
 	}
 
@@ -282,6 +283,20 @@ func runLabSnapshot(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "reverted to snapshot: %s\n", name)
 		return 0
 
+	case "delete":
+		if len(args) != 3 {
+			fmt.Fprintln(stderr, "usage: bootwrangler lab snapshot delete <run-id> <name>")
+			return 2
+		}
+		runID, name := args[1], args[2]
+		run := runFromID(runID)
+		if err := lab.DeleteSnapshot(run, name); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "deleted snapshot: %s\n", name)
+		return 0
+
 	default:
 		fmt.Fprintf(stderr, "unknown snapshot command %q\n", args[0])
 		return 2
@@ -311,4 +326,5 @@ func printLabUsage(w io.Writer) {
 	fmt.Fprintln(w, "  bootwrangler lab snapshot create <run-id> <name>")
 	fmt.Fprintln(w, "  bootwrangler lab snapshot list <run-id>")
 	fmt.Fprintln(w, "  bootwrangler lab snapshot revert <run-id> <name>")
+	fmt.Fprintln(w, "  bootwrangler lab snapshot delete <run-id> <name>")
 }

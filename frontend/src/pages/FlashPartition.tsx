@@ -9,7 +9,7 @@ import {
   imageCacheStatus,
   listDevices,
   listImages,
-  planFlash,
+  planPartitionFlash,
 } from "../api/backend";
 
 // ---------------------------------------------------------------------------
@@ -365,7 +365,7 @@ function SelectPartitionStep({
     setPlanError("");
     setPlanning(true);
     try {
-      const p = await planFlash(target.partition.Path, selectedImage.imagePath);
+      const p = await planPartitionFlash(target.device.Path, target.partition.Path, selectedImage.imagePath);
       setPlan(p);
     } catch (err) {
       setPlanError(String(err));

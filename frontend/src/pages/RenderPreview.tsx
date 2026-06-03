@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Profile } from "../types/profile";
 import {
+  libraryGet,
+  libraryList,
   loadProfile,
+  readRenderedFile,
   renderProfile,
   validateProfile,
   type RenderManifest,
@@ -9,18 +12,46 @@ import {
 
 type RenderState = "idle" | "loading" | "done" | "error";
 
-export default function RenderPreview() {
+const LS_LAST_RENDER_DIR = "bw_last_render_dir";
+
+interface Props {
+  onNavigate?: (section: string) => void;
+}
+
+export default function RenderPreview({ onNavigate }: Props) {
   const [profilePath, setProfilePath] = useState("");
   const [outDir, setOutDir] = useState("");
-  const [dryRunNote] = useState(
-    "Render writes files to the selected output directory. Leave blank to use the current directory.",
-  );
   const [state, setState] = useState<RenderState>("idle");
   const [manifest, setManifest] = useState<RenderManifest | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [validationProblems, setValidationProblems] = useState<string[]>([]);
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [previewContent, setPreviewContent] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [libraryNames, setLibraryNames] = useState<string[]>([]);
+  const [selectedLibName, setSelectedLibName] = useState("");
+
+  useEffect(() => {
+    void libraryList().then((entries) => setLibraryNames(entries.map((e) => e.name))).catch(() => {});
+  }, []);
+
+  async function handleRenderFromLibrary() {
+    if (!selectedLibName) return;
+    setState("loading");
+    setErrorMsg("");
+    setManifest(null);
+    setValidationProblems([]);
+    setPreviewFile(null);
+    let profile: Profile;
+    try {
+      profile = await libraryGet(selectedLibName);
+    } catch (err) {
+      setErrorMsg(`Failed to load library profile: ${String(err)}`);
+      setState("error");
+      return;
+    }
+    await doRender(profile);
+  }
 
   async function handleRender() {
     if (!profilePath.trim()) {
@@ -44,6 +75,11 @@ export default function RenderPreview() {
       return;
     }
 
+    await doRender(profile);
+  }
+
+  async function doRender(profile: Profile) {
+
     const validation = await validateProfile(profile);
     if (!validation.valid) {
       setValidationProblems(validation.problems);
@@ -53,7 +89,9 @@ export default function RenderPreview() {
 
     try {
       const serverBaseURL = localStorage.getItem("bw_server_base_url") ?? "";
-      const result = await renderProfile(profile, outDir.trim() || ".", serverBaseURL);
+      const effectiveOutDir = outDir.trim() || ".";
+      const result = await renderProfile(profile, effectiveOutDir, serverBaseURL);
+      localStorage.setItem(LS_LAST_RENDER_DIR, effectiveOutDir);
       setManifest(result);
       setState("done");
     } catch (err) {
@@ -62,20 +100,58 @@ export default function RenderPreview() {
     }
   }
 
-  function handlePreviewFile(path: string, outDirectory: string) {
+  async function handlePreviewFile(path: string, outDirectory: string) {
     const fullPath = `${outDirectory.trim() || "."}/${path}`;
-    // In browser preview mode we can't read files; show the path
     setPreviewFile(path);
-    setPreviewContent(
-      `File: ${fullPath}\n\n(Open in Neovim or a file manager to view generated content.)`,
-    );
+    setPreviewContent("");
+    setPreviewLoading(true);
+    try {
+      const content = await readRenderedFile(fullPath);
+      setPreviewContent(content);
+    } catch {
+      setPreviewContent(
+        `File: ${fullPath}\n\n(Open in Neovim or a file manager to view generated content.)`,
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
   }
 
   return (
     <div className="render-preview">
       <section className="render-controls panel">
         <h2>Render Profile</h2>
-        <p className="render-hint">{dryRunNote}</p>
+        <p className="render-hint">
+          Render writes installer files to the output directory. Leave output blank to use the
+          current directory.
+        </p>
+
+        {libraryNames.length > 0 && (
+          <div className="render-library-row">
+            <span className="field-label">From library</span>
+            <div className="render-library-input">
+              <select
+                value={selectedLibName}
+                onChange={(e) => setSelectedLibName(e.target.value)}
+              >
+                <option value="">— pick a profile —</option>
+                {libraryNames.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="secondary-action"
+                disabled={!selectedLibName || state === "loading"}
+                onClick={() => void handleRenderFromLibrary()}
+              >
+                Render
+              </button>
+            </div>
+          </div>
+        )}
 
         <label>
           Profile path
@@ -172,7 +248,7 @@ export default function RenderPreview() {
                       <button
                         type="button"
                         className="link-btn"
-                        onClick={() => handlePreviewFile(f.path, outDir)}
+                        onClick={() => void handlePreviewFile(f.path, outDir)}
                       >
                         Preview
                       </button>
@@ -182,6 +258,18 @@ export default function RenderPreview() {
               </tbody>
             </table>
           </div>
+
+          {onNavigate && (
+            <div className="render-result-actions">
+              <button
+                type="button"
+                className="primary-action"
+                onClick={() => onNavigate("Provisioning Server")}
+              >
+                Start Provisioning Server
+              </button>
+            </div>
+          )}
         </section>
       )}
 
@@ -197,7 +285,11 @@ export default function RenderPreview() {
               Close
             </button>
           </div>
-          <pre className="preview-content">{previewContent}</pre>
+          {previewLoading ? (
+            <pre className="preview-content">Loading…</pre>
+          ) : (
+            <pre className="preview-content">{previewContent}</pre>
+          )}
         </section>
       )}
     </div>

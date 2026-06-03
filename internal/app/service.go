@@ -6,8 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
+	"github.com/alexmchughdev/bootwrangler/internal/bootmenu"
 	"github.com/alexmchughdev/bootwrangler/internal/editor"
 	"github.com/alexmchughdev/bootwrangler/internal/images"
 	"github.com/alexmchughdev/bootwrangler/internal/importer"
@@ -130,6 +134,63 @@ func (s *Service) LibraryRemove(name string) error {
 	return lib.Remove(name)
 }
 
+// LibraryCommit creates a versioned git commit for a profile in the library.
+func (s *Service) LibraryCommit(name, message string) error {
+	vlib := library.NewVersioned(library.DefaultDir())
+	if err := vlib.Init(); err != nil {
+		return err
+	}
+	filename := name + ".yaml"
+	return vlib.CommitProfile(filename, message)
+}
+
+// LibraryHistory returns the version log for a profile.
+func (s *Service) LibraryHistory(name string) ([]library.VersionEntry, error) {
+	vlib := library.NewVersioned(library.DefaultDir())
+	if err := vlib.Init(); err != nil {
+		return nil, err
+	}
+	return vlib.History(name + ".yaml")
+}
+
+// LibraryRestoreVersion restores a profile to a specific commit hash.
+func (s *Service) LibraryRestoreVersion(name, hash string) error {
+	vlib := library.NewVersioned(library.DefaultDir())
+	if err := vlib.Init(); err != nil {
+		return err
+	}
+	return vlib.Restore(name+".yaml", hash)
+}
+
+// LibraryDiff returns the unified diff between two commits for a profile.
+func (s *Service) LibraryDiff(name, fromHash, toHash string) (string, error) {
+	vlib := library.NewVersioned(library.DefaultDir())
+	if err := vlib.Init(); err != nil {
+		return "", err
+	}
+	return vlib.Diff(name+".yaml", fromHash, toHash)
+}
+
+// LibraryExportBundle exports a profile from the library to a ZIP bundle at path.
+func (s *Service) LibraryExportBundle(name, path string) error {
+	lib := library.New(library.DefaultDir())
+	p, err := lib.Get(name)
+	if err != nil {
+		return err
+	}
+	return library.ExportBundle(p, path)
+}
+
+// LibraryImportBundle imports a profile ZIP bundle into the library.
+func (s *Service) LibraryImportBundle(path string) (string, error) {
+	lib := library.New(library.DefaultDir())
+	p, err := library.ImportBundle(path)
+	if err != nil {
+		return "", err
+	}
+	return lib.Add(p)
+}
+
 // ServerStart starts the provisioning server serving root at addr.
 // It returns the actual listening address.
 func (s *Service) ServerStart(root, addr string) (string, error) {
@@ -224,6 +285,22 @@ func (s *Service) ImageCacheStatus(id, version, arch string) images.CacheStatus 
 		return images.CacheStatus{}
 	}
 	return images.CheckCache(images.CacheDir(), id, version, arch, img)
+}
+
+// DownloadImage fetches and caches an image by catalogue ID, version, and arch.
+// It blocks until the download completes and returns the local cache path.
+func (s *Service) DownloadImage(id, version, arch string) (string, error) {
+	cat := images.BuiltinCatalogue()
+	_, _, _, img, err := images.FindImage(cat, id, version, arch)
+	if err != nil {
+		return "", err
+	}
+	cacheDir := images.CacheDir()
+	destPath := images.CachedPath(cacheDir, id, version, arch, img)
+	if err := images.Download(img.URL, destPath, nil); err != nil {
+		return "", fmt.Errorf("download failed: %w", err)
+	}
+	return destPath, nil
 }
 
 // ListDevices returns the currently connected block devices with safety annotations.
@@ -337,6 +414,34 @@ func (s *Service) CheckPolicy(policyYAML string, snap policy.ProfileSnapshot) (p
 	return policy.Check(p, snap), nil
 }
 
+// WriteTextFile writes text content to an arbitrary path, rejected if outside home dir.
+func (s *Service) WriteTextFile(path, content string) error {
+	home, _ := os.UserHomeDir()
+	clean := filepath.Clean(path)
+	if home != "" && !strings.HasPrefix(clean, home) {
+		return fmt.Errorf("path outside home directory")
+	}
+	if err := os.MkdirAll(filepath.Dir(clean), 0o750); err != nil {
+		return err
+	}
+	return os.WriteFile(clean, []byte(content), 0o644)
+}
+
+// ReadRenderedFile reads a rendered profile asset file and returns its content.
+// Rejects paths outside the user's home directory.
+func (s *Service) ReadRenderedFile(path string) (string, error) {
+	home, _ := os.UserHomeDir()
+	clean := filepath.Clean(path)
+	if home != "" && !strings.HasPrefix(clean, home) {
+		return "", fmt.Errorf("path outside home directory")
+	}
+	data, err := os.ReadFile(clean)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 // ImportConfig auto-detects the installer config format and converts it to a BootWrangler profile.
 func (s *Service) ImportConfig(content string) (importer.ImportResult, error) {
 	return importer.Import(content)
@@ -374,6 +479,18 @@ func (s *Service) ExpandRolePreset(name, osFamily string) ([]string, []string, [
 		return nil, nil, nil, err
 	}
 	return presets.ExpandRole(r, osFamily)
+}
+
+// RenderIPXEMenu renders a boot menu as an iPXE script.
+func (s *Service) RenderIPXEMenu(title string, entries []bootmenu.Entry) (string, error) {
+	m := bootmenu.Menu{Title: title, Entries: entries}
+	return bootmenu.RenderIPXE(m)
+}
+
+// RenderGRUBMenu renders a boot menu as a GRUB config.
+func (s *Service) RenderGRUBMenu(title string, entries []bootmenu.Entry) (string, error) {
+	m := bootmenu.Menu{Title: title, Entries: entries}
+	return bootmenu.RenderGRUB(m)
 }
 
 func validationResult(err error) ValidationResult {

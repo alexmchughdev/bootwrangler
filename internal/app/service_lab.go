@@ -119,6 +119,28 @@ func (s *Service) LabListSnapshots(runID string) ([]string, error) {
 	return lab.ListSnapshots(run)
 }
 
+// LabRevertSnapshot reverts the disk to a named snapshot. The VM must be stopped first.
+func (s *Service) LabRevertSnapshot(runID, name string) error {
+	labMu.Lock()
+	run, ok := labRuns[runID]
+	labMu.Unlock()
+	if !ok {
+		return fmt.Errorf("lab run not found: %s", runID)
+	}
+	return lab.RevertSnapshot(run, name)
+}
+
+// LabDeleteSnapshot deletes a named snapshot from the disk image.
+func (s *Service) LabDeleteSnapshot(runID, name string) error {
+	labMu.Lock()
+	run, ok := labRuns[runID]
+	labMu.Unlock()
+	if !ok {
+		return fmt.Errorf("lab run not found: %s", runID)
+	}
+	return lab.DeleteSnapshot(run, name)
+}
+
 // LabListRuns returns all active lab VM runs tracked in this session.
 func (s *Service) LabListRuns() []lab.Run {
 	labMu.Lock()

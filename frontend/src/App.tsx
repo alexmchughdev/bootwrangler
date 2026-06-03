@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { getHealth, listDevices, type HealthStatus } from "./api/backend";
 import type { Profile } from "./types/profile";
 import { navigationItems } from "./navigation";
+import BootMenu from "./pages/BootMenu";
 import FlashImage from "./pages/FlashImage";
+import Policy from "./pages/Policy";
 import FlashPartition from "./pages/FlashPartition";
 import HostInspection from "./pages/HostInspection";
 import Images from "./pages/Images";
@@ -89,17 +91,18 @@ function App() {
         </header>
 
         {activeSection === "Profiles" ? (
-          <ProfileEditor key={profileEditorKey} initialProfile={importedProfile} />
+          <ProfileEditor key={profileEditorKey} initialProfile={importedProfile} onNavigate={setActiveSection} />
         ) : activeSection === "Library" ? (
           <ProfileLibrary
             key={libraryKey}
-            onOpen={(_profile, _filename) => {
-              setActiveSection("Profiles");
-              setProfileEditorKey((k) => k + 1);
+            onOpen={(profile, _filename) => {
+              handleOpenImported(profile);
             }}
           />
         ) : activeSection === "Render" ? (
-          <RenderPreview />
+          <RenderPreview onNavigate={setActiveSection} />
+        ) : activeSection === "Policy" ? (
+          <Policy />
         ) : activeSection === "Provisioning Server" ? (
           <ProvisioningServer />
         ) : activeSection === "Images" ? (
@@ -109,11 +112,13 @@ function App() {
         ) : activeSection === "Flash Partition" ? (
           <FlashPartition />
         ) : activeSection === "USB Devices" ? (
-          <USBDevices />
+          <USBDevices onNavigate={setActiveSection} />
         ) : activeSection === "Host Info" ? (
           <HostInspection />
         ) : activeSection === "Media Builder" ? (
           <MediaBuilder />
+        ) : activeSection === "Boot Menu" ? (
+          <BootMenu />
         ) : activeSection === "Lab" ? (
           <Lab />
         ) : activeSection === "Import" ? (
@@ -121,7 +126,7 @@ function App() {
         ) : activeSection === "Settings" ? (
           <Settings />
         ) : (
-          <Dashboard />
+          <Dashboard onNavigate={setActiveSection} />
         )}
       </section>
     </main>
@@ -136,7 +141,11 @@ interface ServerAddrService {
   ServerAddr(): Promise<string>;
 }
 
-function Dashboard() {
+interface DashboardProps {
+  onNavigate: (section: string) => void;
+}
+
+function Dashboard({ onNavigate }: DashboardProps) {
   const [profileCount, setProfileCount] = useState<number | null>(null);
   const [deviceCount, setDeviceCount] = useState<number | null>(null);
   const [serverRunning, setServerRunning] = useState<boolean | null>(null);
@@ -160,34 +169,50 @@ function Dashboard() {
   const serverLabel = serverRunning === null ? "—" : serverRunning ? "Running" : "Stopped";
 
   return (
-        <div className="dashboard-grid">
-          <article className="panel panel-wide">
-            <span className="panel-label">Workspace Status</span>
-            <h2>Desktop foundation ready</h2>
-            <p>
-              Profile workflows, image management, media composition, and lab
-              controls will appear here as their backend services are added.
-            </p>
-          </article>
-
-          <article className="panel">
-            <span className="panel-label">Profiles</span>
-            <strong>{profileLabel}</strong>
-            <p>Local profiles</p>
-          </article>
-
-          <article className="panel">
-            <span className="panel-label">USB Devices</span>
-            <strong>{deviceLabel}</strong>
-            <p>Connected targets</p>
-          </article>
-
-          <article className="panel">
-            <span className="panel-label">Provisioning Server</span>
-            <strong>{serverLabel}</strong>
-            <p>No build root selected</p>
-          </article>
+    <div className="dashboard-grid">
+      <article className="panel panel-wide">
+        <span className="panel-label">Quick Actions</span>
+        <h2>Get started</h2>
+        <div className="dashboard-actions">
+          <button type="button" className="dashboard-action-btn" onClick={() => onNavigate("Profiles")}>
+            New Profile
+          </button>
+          <button type="button" className="dashboard-action-btn" onClick={() => onNavigate("Library")}>
+            Open Library
+          </button>
+          <button type="button" className="dashboard-action-btn" onClick={() => onNavigate("Images")}>
+            Manage Images
+          </button>
+          <button type="button" className="dashboard-action-btn" onClick={() => onNavigate("Lab")}>
+            Launch Lab VM
+          </button>
+          <button type="button" className="dashboard-action-btn" onClick={() => onNavigate("Render")}>
+            Render Profile
+          </button>
+          <button type="button" className="dashboard-action-btn" onClick={() => onNavigate("Boot Menu")}>
+            Build Boot Menu
+          </button>
         </div>
+      </article>
+
+      <article className="panel dashboard-stat" onClick={() => onNavigate("Library")} role="button" tabIndex={0}>
+        <span className="panel-label">Profiles</span>
+        <strong className="dashboard-stat-value">{profileLabel}</strong>
+        <p>Saved in library</p>
+      </article>
+
+      <article className="panel dashboard-stat" onClick={() => onNavigate("USB Devices")} role="button" tabIndex={0}>
+        <span className="panel-label">USB Devices</span>
+        <strong className="dashboard-stat-value">{deviceLabel}</strong>
+        <p>Connected targets</p>
+      </article>
+
+      <article className="panel dashboard-stat" onClick={() => onNavigate("Provisioning Server")} role="button" tabIndex={0}>
+        <span className="panel-label">Provisioning Server</span>
+        <strong className="dashboard-stat-value">{serverLabel}</strong>
+        <p>{serverRunning ? "Serving files" : "Click to configure"}</p>
+      </article>
+    </div>
   );
 }
 

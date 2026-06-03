@@ -1,6 +1,7 @@
 package app
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -55,5 +56,107 @@ func TestServiceLoadAndSaveProfile(t *testing.T) {
 	}
 	if got.Name != source.Name {
 		t.Fatalf("LoadProfile().Name = %q, want %q", got.Name, source.Name)
+	}
+}
+
+func TestServiceLibraryRoundtrip(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	svc := NewService()
+	source, err := profile.LoadAndValidateFile("../../examples/profiles/ubuntu-server.yaml")
+	if err != nil {
+		t.Fatalf("LoadAndValidateFile() error = %v", err)
+	}
+
+	if err := svc.LibraryInit(); err != nil {
+		t.Fatalf("LibraryInit() error = %v", err)
+	}
+
+	name, err := svc.LibraryAdd(source)
+	if err != nil {
+		t.Fatalf("LibraryAdd() error = %v", err)
+	}
+	if name == "" {
+		t.Fatal("LibraryAdd() returned empty name")
+	}
+
+	got, err := svc.LibraryGet(source.Name)
+	if err != nil {
+		t.Fatalf("LibraryGet() error = %v", err)
+	}
+	if got.Name != source.Name {
+		t.Fatalf("LibraryGet().Name = %q, want %q", got.Name, source.Name)
+	}
+
+	entries, err := svc.LibraryList()
+	if err != nil {
+		t.Fatalf("LibraryList() len error = %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("LibraryList() len = %d, want 1", len(entries))
+	}
+
+	if err := svc.LibraryRemove(source.Name); err != nil {
+		t.Fatalf("LibraryRemove() error = %v", err)
+	}
+}
+
+func TestServiceLibraryExportImportBundle(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	svc := NewService()
+	source, err := profile.LoadAndValidateFile("../../examples/profiles/ubuntu-server.yaml")
+	if err != nil {
+		t.Fatalf("LoadAndValidateFile() error = %v", err)
+	}
+
+	if err := svc.LibraryInit(); err != nil {
+		t.Fatalf("LibraryInit() error = %v", err)
+	}
+	if _, err := svc.LibraryAdd(source); err != nil {
+		t.Fatalf("LibraryAdd() error = %v", err)
+	}
+
+	zipPath := filepath.Join(t.TempDir(), "profile.zip")
+	if err := svc.LibraryExportBundle(source.Name, zipPath); err != nil {
+		t.Fatalf("LibraryExportBundle() error = %v", err)
+	}
+	if _, err := os.Stat(zipPath); err != nil {
+		t.Fatalf("exported bundle does not exist: %v", err)
+	}
+}
+
+func TestServiceLibraryVersioning(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	svc := NewService()
+	source, err := profile.LoadAndValidateFile("../../examples/profiles/ubuntu-server.yaml")
+	if err != nil {
+		t.Fatalf("LoadAndValidateFile() error = %v", err)
+	}
+
+	if err := svc.LibraryInit(); err != nil {
+		t.Fatalf("LibraryInit() error = %v", err)
+	}
+	if _, err := svc.LibraryAdd(source); err != nil {
+		t.Fatalf("LibraryAdd() error = %v", err)
+	}
+
+	if err := svc.LibraryCommit(source.Name, "initial version"); err != nil {
+		t.Fatalf("LibraryCommit() error = %v", err)
+	}
+
+	entries, err := svc.LibraryHistory(source.Name)
+	if err != nil {
+		t.Fatalf("LibraryHistory() error = %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("LibraryHistory() returned empty, want at least one entry")
+	}
+	if entries[0].Message != "initial version" {
+		t.Fatalf("LibraryHistory()[0].Message = %q, want %q", entries[0].Message, "initial version")
 	}
 }

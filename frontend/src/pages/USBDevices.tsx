@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { listDevices, type Partition, type UsbDevice } from "../api/backend";
 
-export default function USBDevices() {
+interface Props {
+  onNavigate?: (section: string) => void;
+}
+
+export default function USBDevices({ onNavigate }: Props) {
   const [devices, setDevices] = useState<UsbDevice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -62,6 +66,7 @@ export default function USBDevices() {
             device={dev}
             isExpanded={expanded.has(dev.Path)}
             onToggle={() => toggleExpanded(dev.Path)}
+            onFlash={() => onNavigate?.("Flash Image")}
           />
         ))}
       </div>
@@ -73,13 +78,10 @@ interface DeviceCardProps {
   device: UsbDevice;
   isExpanded: boolean;
   onToggle: () => void;
+  onFlash: () => void;
 }
 
-function DeviceCard({ device, isExpanded, onToggle }: DeviceCardProps) {
-  function handleFlash() {
-    alert("Flash workflow coming soon");
-  }
-
+function DeviceCard({ device, isExpanded, onToggle, onFlash }: DeviceCardProps) {
   return (
     <article className="usb-device-card panel">
       <div className="usb-device-header">
@@ -131,7 +133,7 @@ function DeviceCard({ device, isExpanded, onToggle }: DeviceCardProps) {
             <button
               type="button"
               className="secondary-action"
-              onClick={handleFlash}
+              onClick={onFlash}
             >
               Flash Image
             </button>

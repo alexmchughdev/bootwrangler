@@ -146,6 +146,13 @@ func runLibrary(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "  bootwrangler library add <profile.yaml>")
 		fmt.Fprintln(stderr, "  bootwrangler library show <name>")
 		fmt.Fprintln(stderr, "  bootwrangler library remove <name>")
+		fmt.Fprintln(stderr, "  bootwrangler library export <name> [--out <file.zip>]")
+		fmt.Fprintln(stderr, "  bootwrangler library import <file.zip>")
+		fmt.Fprintln(stderr, "  bootwrangler library render [--out <dir>] [<name> ...]")
+		fmt.Fprintln(stderr, "  bootwrangler library commit <name> <message>")
+		fmt.Fprintln(stderr, "  bootwrangler library history <name>")
+		fmt.Fprintln(stderr, "  bootwrangler library restore <name> <hash>")
+		fmt.Fprintln(stderr, "  bootwrangler library diff <name> <hash1> <hash2>")
 		return 2
 	}
 
@@ -264,6 +271,141 @@ func runLibrary(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "imported profile %q as %s\n", p.Name, filename)
 		return 0
 
+	case "render":
+		outBase := "."
+		names := []string{}
+		for i := 1; i < len(args); i++ {
+			if args[i] == "--out" {
+				if i+1 >= len(args) {
+					fmt.Fprintln(stderr, "library render: --out requires a directory argument")
+					return 2
+				}
+				outBase = args[i+1]
+				i++
+			} else {
+				names = append(names, args[i])
+			}
+		}
+		if len(names) == 0 {
+			entries, err := lib.List()
+			if err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+			for _, e := range entries {
+				names = append(names, e.Name)
+			}
+		}
+		if len(names) == 0 {
+			fmt.Fprintln(stdout, "no profiles to render")
+			return 0
+		}
+		failed := false
+		for _, name := range names {
+			p, err := lib.Get(name)
+			if err != nil {
+				fmt.Fprintf(stderr, "  ERROR %s: %v\n", name, err)
+				failed = true
+				continue
+			}
+			r, err := render.Lookup(p.OS.Family)
+			if err != nil {
+				fmt.Fprintf(stderr, "  ERROR %s: %v\n", name, err)
+				failed = true
+				continue
+			}
+			outDir := outBase + "/" + name
+			opts := render.Options{OutDir: outDir}
+			if _, err := r.Render(p, opts); err != nil {
+				fmt.Fprintf(stderr, "  ERROR %s: %v\n", name, err)
+				failed = true
+				continue
+			}
+			fmt.Fprintf(stdout, "  OK    %s → %s\n", name, outDir)
+		}
+		if failed {
+			return 1
+		}
+		return 0
+
+	case "history":
+		if len(args) != 2 {
+			fmt.Fprintln(stderr, "usage: bootwrangler library history <name>")
+			return 2
+		}
+		vlib := library.NewVersioned(library.DefaultDir())
+		if err := vlib.Init(); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		entries, err := vlib.History(args[1] + ".yaml")
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if len(entries) == 0 {
+			fmt.Fprintln(stdout, "no version history")
+			return 0
+		}
+		for _, e := range entries {
+			fmt.Fprintf(stdout, "%s  %s  %s\n", e.Hash[:8], e.Timestamp.Format("2006-01-02 15:04:05"), e.Message)
+		}
+		return 0
+
+	case "commit":
+		if len(args) < 3 {
+			fmt.Fprintln(stderr, "usage: bootwrangler library commit <name> <message>")
+			return 2
+		}
+		vlib := library.NewVersioned(library.DefaultDir())
+		if err := vlib.Init(); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		filename := args[1] + ".yaml"
+		msg := strings.Join(args[2:], " ")
+		if err := vlib.CommitProfile(filename, msg); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "committed %q: %s\n", args[1], msg)
+		return 0
+
+	case "restore":
+		if len(args) != 3 {
+			fmt.Fprintln(stderr, "usage: bootwrangler library restore <name> <hash>")
+			return 2
+		}
+		vlib := library.NewVersioned(library.DefaultDir())
+		if err := vlib.Init(); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if err := vlib.Restore(args[1]+".yaml", args[2]); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "restored %q to %s\n", args[1], args[2])
+		return 0
+
+	case "diff":
+		if len(args) != 4 {
+			fmt.Fprintln(stderr, "usage: bootwrangler library diff <name> <hash1> <hash2>")
+			return 2
+		}
+		vlib := library.NewVersioned(library.DefaultDir())
+		if err := vlib.Init(); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		diff, err := vlib.Diff(args[1]+".yaml", args[2], args[3])
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprint(stdout, diff)
+		return 0
+
 	default:
 		fmt.Fprintf(stderr, "unknown library command %q\n", args[0])
 		return 2
@@ -330,6 +472,7 @@ func runImages(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage:")
 		fmt.Fprintln(stderr, "  bootwrangler images list")
 		fmt.Fprintln(stderr, "  bootwrangler images show <id>")
+		fmt.Fprintln(stderr, "  bootwrangler images download <id> <version> <arch>")
 		return 2
 	}
 
@@ -367,6 +510,37 @@ func runImages(args []string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stderr, "image not found: %s\n", id)
 		return 1
+
+	case "download":
+		if len(args) != 4 {
+			fmt.Fprintln(stderr, "usage: bootwrangler images download <id> <version> <arch>")
+			return 2
+		}
+		id, version, arch := args[1], args[2], args[3]
+		_, _, _, img, err := images.FindImage(cat, id, version, arch)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		cacheDir := images.CacheDir()
+		destPath := images.CachedPath(cacheDir, id, version, arch, img)
+		fmt.Fprintf(stdout, "downloading %s → %s\n", img.URL, destPath)
+		var lastPct int64
+		if err := images.Download(img.URL, destPath, func(written, total int64) {
+			if total <= 0 {
+				return
+			}
+			pct := written * 100 / total
+			if pct != lastPct && pct%10 == 0 {
+				fmt.Fprintf(stdout, "  %d%%\n", pct)
+				lastPct = pct
+			}
+		}); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "done: %s\n", destPath)
+		return 0
 
 	default:
 		fmt.Fprintf(stderr, "unknown images command %q\n", args[0])

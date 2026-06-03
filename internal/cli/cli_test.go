@@ -82,6 +82,119 @@ func TestRunProfileValidate(t *testing.T) {
 	}
 }
 
+func TestRunLibraryNoArgs(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run([]string{"library"}, &stdout, &stderr)
+
+	if exitCode != 2 {
+		t.Fatalf("Run() exit code = %d, want 2", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "library history") {
+		t.Fatalf("Run() stderr = %q, want usage including history", stderr.String())
+	}
+}
+
+func TestRunLibraryUnknownSubcommand(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run([]string{"library", "frob"}, &stdout, &stderr)
+
+	if exitCode != 2 {
+		t.Fatalf("Run() exit code = %d, want 2", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "unknown library command") {
+		t.Fatalf("Run() stderr = %q, want unknown command error", stderr.String())
+	}
+}
+
+func TestRunImagesNoArgs(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run([]string{"images"}, &stdout, &stderr)
+
+	if exitCode != 2 {
+		t.Fatalf("Run() exit code = %d, want 2", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "images list") {
+		t.Fatalf("Run() stderr = %q, want usage", stderr.String())
+	}
+}
+
+func TestRunImagesList(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run([]string{"images", "list"}, &stdout, &stderr)
+
+	if exitCode != 0 {
+		t.Fatalf("Run() exit code = %d, want 0; stderr = %q", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "ubuntu") {
+		t.Fatalf("Run() stdout = %q, want ubuntu image listing", stdout.String())
+	}
+}
+
+func TestRunPolicyCheckNoProfile(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run([]string{"policy", "check"}, &stdout, &stderr)
+
+	if exitCode != 2 {
+		t.Fatalf("Run() exit code = %d, want 2", exitCode)
+	}
+	if !strings.Contains(stderr.String(), "policy check") {
+		t.Fatalf("Run() stderr = %q, want usage message", stderr.String())
+	}
+}
+
+func TestRunPolicyCheckValidProfile(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run([]string{"policy", "check", "../../examples/profiles/alpine-minimal.yaml"}, &stdout, &stderr)
+
+	if exitCode != 0 {
+		t.Fatalf("Run() exit code = %d, want 0; stderr = %q; stdout = %q", exitCode, stderr.String(), stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "passed") {
+		t.Fatalf("Run() stdout = %q, want 'passed'", stdout.String())
+	}
+}
+
+func TestRunLibraryRenderNoArgs(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run([]string{"library", "render"}, &stdout, &stderr)
+
+	// Empty library should succeed and print "no profiles to render"
+	if exitCode != 0 {
+		t.Fatalf("Run() exit code = %d, want 0; stderr = %q", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "no profiles") {
+		t.Fatalf("Run() stdout = %q, want 'no profiles' message", stdout.String())
+	}
+}
+
 func TestParseProfileEditArgs(t *testing.T) {
 	t.Parallel()
 

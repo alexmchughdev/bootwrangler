@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { validateSSHPublicKey } from "../api/backend";
 
 const LS_KEY = "bw_server_base_url";
+const LS_LAST_RENDER_DIR = "bw_last_render_dir";
 
 interface VersionedService {
   Version(): Promise<string>;
@@ -14,11 +16,17 @@ export default function Settings() {
   const [serverBaseURL, setServerBaseURL] = useState("");
   const [saved, setSaved] = useState(false);
   const [version, setVersion] = useState("dev");
+  const [lastRenderDir, setLastRenderDir] = useState("");
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [sshKey, setSSHKey] = useState("");
+  const [sshResult, setSSHResult] = useState<{ valid: boolean; problems: string[] } | null>(null);
+  const [sshChecking, setSSHChecking] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(LS_KEY);
     if (stored) setServerBaseURL(stored);
+    const dir = localStorage.getItem(LS_LAST_RENDER_DIR);
+    if (dir) setLastRenderDir(dir);
 
     const svc = getVersionedService();
     if (svc) {
@@ -35,6 +43,19 @@ export default function Settings() {
     setSaved(true);
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function handleValidateSSH() {
+    setSSHChecking(true);
+    setSSHResult(null);
+    try {
+      const result = await validateSSHPublicKey(sshKey.trim());
+      setSSHResult(result);
+    } catch (err) {
+      setSSHResult({ valid: false, problems: [String(err)] });
+    } finally {
+      setSSHChecking(false);
+    }
   }
 
   return (
@@ -64,6 +85,82 @@ export default function Settings() {
             </button>
           </div>
           {saved && <span className="settings-saved">Saved</span>}
+        </div>
+      </article>
+
+      {lastRenderDir && (
+        <article className="panel settings-section">
+          <span className="panel-label">Quick Access</span>
+          <h2>Last Render Output</h2>
+          <p className="settings-description">
+            The provisioning server uses this directory as its default root.
+          </p>
+          <div className="settings-field">
+            <span className="field-label">Directory</span>
+            <div className="settings-input-row">
+              <code className="settings-code">{lastRenderDir}</code>
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => {
+                  localStorage.removeItem(LS_LAST_RENDER_DIR);
+                  setLastRenderDir("");
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </article>
+      )}
+
+      <article className="panel settings-section">
+        <span className="panel-label">Security Tools</span>
+        <h2>SSH Key Validator</h2>
+        <p className="settings-description">
+          Paste an SSH public key to verify it is correctly formatted before
+          adding it to a profile's authorized keys.
+        </p>
+        <div className="settings-field">
+          <span className="field-label">SSH Public Key</span>
+          <textarea
+            className="settings-ssh-input"
+            placeholder="ssh-ed25519 AAAA... user@host"
+            value={sshKey}
+            rows={3}
+            onChange={(e) => { setSSHKey(e.target.value); setSSHResult(null); }}
+          />
+          <div className="settings-input-row settings-ssh-actions">
+            <button
+              type="button"
+              className="primary-action"
+              onClick={() => void handleValidateSSH()}
+              disabled={sshChecking || !sshKey.trim()}
+            >
+              {sshChecking ? "Checking…" : "Validate Key"}
+            </button>
+            {sshKey && (
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => { setSSHKey(""); setSSHResult(null); }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {sshResult && (
+            <div className={`policy-result ${sshResult.valid ? "policy-pass" : "policy-fail"}`}>
+              <strong>{sshResult.valid ? "Valid key" : "Invalid key"}</strong>
+              {sshResult.problems.length > 0 && (
+                <ul className="policy-violations">
+                  {sshResult.problems.map((p, i) => (
+                    <li key={i}>{p}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       </article>
 

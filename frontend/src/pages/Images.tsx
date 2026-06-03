@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   type CacheStatus,
   type CatalogueEntry,
+  downloadImage,
   imageCacheStatus,
   listImages,
 } from "../api/backend";
@@ -24,6 +25,8 @@ export default function Images() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [downloading, setDownloading] = useState<Record<string, boolean>>({});
+  const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({});
 
   function collectKeys(catalogue: CatalogueEntry[]): VersionArchKey[] {
     const keys: VersionArchKey[] = [];
@@ -92,8 +95,20 @@ export default function Images() {
     }
   }
 
-  function handleDownload(name: string) {
-    alert(`Download not yet implemented in GUI (${name})`);
+  async function handleDownload(id: string, version: string, arch: string) {
+    const key = cacheKey(id, version, arch);
+    setDownloading((prev) => ({ ...prev, [key]: true }));
+    setDownloadErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
+    try {
+      await downloadImage(id, version, arch);
+      // Refresh cache status for this entry
+      const status = await imageCacheStatus(id, version, arch);
+      setCacheMap((prev) => ({ ...prev, [key]: status }));
+    } catch (err) {
+      setDownloadErrors((prev) => ({ ...prev, [key]: String(err) }));
+    } finally {
+      setDownloading((prev) => { const n = { ...prev }; delete n[key]; return n; });
+    }
   }
 
   return (
@@ -126,13 +141,6 @@ export default function Images() {
                   <strong className="image-name">{entry.Name}</strong>
                   <code className="image-id">{entry.ID}</code>
                 </div>
-                <button
-                  className="secondary-action"
-                  onClick={() => handleDownload(entry.Name)}
-                  type="button"
-                >
-                  Download
-                </button>
               </div>
 
               <div className="image-versions">
@@ -144,6 +152,8 @@ export default function Images() {
                         const key = cacheKey(entry.ID, ver.Version, archEntry.Arch);
                         const status = cacheMap[key];
                         const firstImg = archEntry.Images[0];
+                        const isDownloading = !!downloading[key];
+                        const dlError = downloadErrors[key];
                         return (
                           <div className="image-arch-entry" key={archEntry.Arch}>
                             <span className="image-arch-badge">{archEntry.Arch}</span>
@@ -181,6 +191,25 @@ export default function Images() {
                                   </span>
                                 ))}
                               </div>
+                            )}
+
+                            {!status?.Cached && (
+                              <button
+                                className="secondary-action image-download-btn"
+                                disabled={isDownloading}
+                                onClick={() =>
+                                  void handleDownload(entry.ID, ver.Version, archEntry.Arch)
+                                }
+                                type="button"
+                              >
+                                {isDownloading ? "Downloading…" : "Download"}
+                              </button>
+                            )}
+
+                            {dlError && (
+                              <span className="image-dl-error" title={dlError}>
+                                Failed
+                              </span>
                             )}
                           </div>
                         );

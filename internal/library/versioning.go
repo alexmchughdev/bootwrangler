@@ -49,6 +49,9 @@ func (v *VersionedLibrary) initGit() error {
 	if err := gitRun(gitDir, "config", "user.name", "BootWrangler"); err != nil {
 		return fmt.Errorf("version history: git config: %w", err)
 	}
+	if err := gitRun(gitDir, "config", "commit.gpgsign", "false"); err != nil {
+		return fmt.Errorf("version history: git config: %w", err)
+	}
 	return nil
 }
 

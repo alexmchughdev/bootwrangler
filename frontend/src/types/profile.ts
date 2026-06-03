@@ -154,3 +154,65 @@ export function createDefaultUser(): User {
     ssh_keys: [],
   };
 }
+
+export interface ProfileTemplate {
+  label: string;
+  description: string;
+  profile: Profile;
+}
+
+function baseProfile(name: string, hostname: string): Profile {
+  return {
+    ...createDefaultProfile(),
+    name,
+    system: { hostname, timezone: "Europe/London", keyboard: "gb", locale: "en_GB.UTF-8" },
+  };
+}
+
+export const PROFILE_TEMPLATES: ProfileTemplate[] = [
+  {
+    label: "Minimal Server",
+    description: "Bare-bones server with SSH only",
+    profile: {
+      ...baseProfile("minimal-server", "minimal-server"),
+      packages: { presets: ["minimal"], names: [] },
+      services: { enable: ["ssh"] },
+    },
+  },
+  {
+    label: "Web Server",
+    description: "Nginx + Certbot + UFW firewall",
+    profile: {
+      ...baseProfile("web-server", "web-server"),
+      packages: { presets: ["web-server"], names: ["certbot", "ufw"] },
+      services: { enable: ["ssh", "nginx", "ufw"] },
+    },
+  },
+  {
+    label: "Database Server",
+    description: "PostgreSQL with pgBackRest and UFW",
+    profile: {
+      ...baseProfile("db-server", "db-server"),
+      packages: { presets: ["database"], names: ["pgbackrest", "ufw"] },
+      services: { enable: ["ssh", "postgresql", "ufw"] },
+    },
+  },
+  {
+    label: "Dev Machine",
+    description: "Build tools, Git, editors, Docker",
+    profile: {
+      ...baseProfile("dev-machine", "dev-machine"),
+      packages: { presets: ["dev-tools"], names: ["docker.io", "tmux", "ripgrep"] },
+      services: { enable: ["ssh", "docker"] },
+    },
+  },
+  {
+    label: "Kubernetes Node",
+    description: "containerd, kubeadm, kubelet, kubectl",
+    profile: {
+      ...baseProfile("k8s-node", "k8s-node"),
+      packages: { presets: ["container-runtime"], names: ["kubelet", "kubeadm", "kubectl"] },
+      services: { enable: ["ssh", "containerd", "kubelet"] },
+    },
+  },
+];

@@ -28,8 +28,9 @@ function getServerService(): ServerService | undefined {
 export default function ProvisioningServer() {
   const [running, setRunning] = useState(false);
   const [addr, setAddr] = useState("");
-  const [root, setRoot] = useState("");
+  const [root, setRoot] = useState(() => localStorage.getItem("bw_last_render_dir") ?? "");
   const [listenAddr, setListenAddr] = useState("0.0.0.0:8088");
+  const [copied, setCopied] = useState(false);
   const [logs, setLogs] = useState<RequestLog[]>([]);
   const [events, setEvents] = useState<CallbackEvent[]>([]);
   const [error, setError] = useState("");
@@ -80,6 +81,13 @@ export default function ProvisioningServer() {
     } catch (err) {
       setError(String(err));
     }
+  }
+
+  async function handleCopyURL() {
+    const url = `http://${addr || listenAddr}`;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   async function handleStop() {
@@ -137,6 +145,13 @@ export default function ProvisioningServer() {
             <div className="server-url">
               <span className="panel-label">Address</span>
               <code>{addr || listenAddr}</code>
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => void handleCopyURL()}
+              >
+                {copied ? "Copied!" : "Copy URL"}
+              </button>
             </div>
             <div className="server-url">
               <span className="panel-label">Serving</span>

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  checkPolicy,
   expandPackagePresets,
   listPackagePresets,
   listRolePresets,
@@ -9,12 +10,23 @@ import {
   validateProfile,
   validateSSHPublicKey,
   type PackagePreset,
+  type PolicyCheckResult,
   type RolePreset,
   type ValidationResult,
 } from "../api/backend";
+
+interface LibraryService {
+  LibraryInit(): Promise<void>;
+  LibraryAdd(value: Profile): Promise<string>;
+}
+
+function getLibraryService(): LibraryService | undefined {
+  return window.go?.app?.Service as unknown as LibraryService | undefined;
+}
 import {
   createDefaultProfile,
   createDefaultUser,
+  PROFILE_TEMPLATES,
   type Profile,
   type Script,
   type User,
@@ -25,7 +37,9 @@ const pendingValidation: ValidationResult = {
   problems: ["Waiting for backend validation."],
 };
 
-function ProfileEditor({ initialProfile }: { initialProfile?: Profile }) {
+const LS_LAB_PROFILE = "bw_lab_profile_name";
+
+function ProfileEditor({ initialProfile, onNavigate }: { initialProfile?: Profile; onNavigate?: (section: string) => void }) {
   const [profile, setProfile] = useState(() => initialProfile ? normalizeProfile(initialProfile) : createDefaultProfile());
   const [path, setPath] = useState("");
   const [validation, setValidation] = useState(pendingValidation);
@@ -75,6 +89,27 @@ function ProfileEditor({ initialProfile }: { initialProfile?: Profile }) {
     }
   }
 
+  async function handleSaveToLibrary() {
+    const svc = getLibraryService();
+    if (!svc) {
+      setMessage("Backend unavailable.");
+      return;
+    }
+    try {
+      await svc.LibraryInit();
+      const savedName = await svc.LibraryAdd(profile);
+      setMessage(`Saved "${savedName}" to library`);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
+  function handleTestInLab() {
+    if (!profile.name) return;
+    localStorage.setItem(LS_LAB_PROFILE, profile.name);
+    onNavigate?.("Lab");
+  }
+
   return (
     <div className="profile-editor">
       <section className="editor-toolbar panel">
@@ -94,6 +129,22 @@ function ProfileEditor({ initialProfile }: { initialProfile?: Profile }) {
           <button className="secondary-action" onClick={() => setProfile(createDefaultProfile())} type="button">
             New
           </button>
+          <select
+            className="template-select"
+            value=""
+            onChange={(e) => {
+              const t = PROFILE_TEMPLATES.find((tmpl) => tmpl.label === e.target.value);
+              if (t) {
+                setProfile(normalizeProfile(t.profile));
+                setMessage(`Loaded template: ${t.label}`);
+              }
+            }}
+          >
+            <option value="" disabled>From template…</option>
+            {PROFILE_TEMPLATES.map((t) => (
+              <option key={t.label} value={t.label} title={t.description}>{t.label}</option>
+            ))}
+          </select>
           <button className="secondary-action" disabled={!path} onClick={handleLoad} type="button">
             Load
           </button>
@@ -103,6 +154,14 @@ function ProfileEditor({ initialProfile }: { initialProfile?: Profile }) {
           <button className="primary-action" disabled={!path || !validation.valid} onClick={handleSave} type="button">
             Save
           </button>
+          <button className="secondary-action" disabled={!validation.valid} onClick={() => void handleSaveToLibrary()} type="button">
+            Save to Library
+          </button>
+          {onNavigate && (
+            <button className="secondary-action" disabled={!profile.name || !validation.valid} onClick={handleTestInLab} type="button">
+              Test in Lab
+            </button>
+          )}
         </div>
       </section>
 
@@ -294,6 +353,8 @@ function ProfileEditor({ initialProfile }: { initialProfile?: Profile }) {
         <PackagesSection profile={profile} setProfile={setProfile} />
       </div>
 
+      <PolicyCheckSection profile={profile} />
+
       <UsersEditor profile={profile} setProfile={setProfile} />
       <ScriptsEditor path={path} profile={profile} setMessage={setMessage} setProfile={setProfile} />
     </div>
@@ -410,6 +471,91 @@ function PackagesSection({ profile, setProfile }: ProfileEditorProps) {
           />
         </Field>
       </div>
+    </section>
+  );
+}
+
+function PolicyCheckSection({ profile }: { profile: Profile }) {
+  const [open, setOpen] = useState(false);
+  const [policyYAML, setPolicyYAML] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<PolicyCheckResult | null>(null);
+  const [policyError, setPolicyError] = useState("");
+
+  async function handleCheck() {
+    setChecking(true);
+    setResult(null);
+    setPolicyError("");
+    try {
+      const snap = {
+        OSFamily: profile.os.family,
+        SSHPasswordAuth: profile.ssh.password_authentication,
+        SSHPermitRootLogin: profile.ssh.permit_root_login,
+        DiskConfirmDestructive: profile.disk.confirm_destructive,
+        Users: profile.users.map((u) => u.name),
+        Packages: profile.packages.names,
+        PackagePresets: profile.packages.presets,
+      };
+      const checkResult = await checkPolicy(policyYAML, snap);
+      setResult(checkResult);
+    } catch (error) {
+      setPolicyError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  return (
+    <section className="panel editor-list">
+      <div className="section-header">
+        <span className="panel-label">Policy Check</span>
+        <button className="secondary-action" onClick={() => setOpen(!open)} type="button">
+          {open ? "▲ Collapse" : "▼ Expand"}
+        </button>
+      </div>
+      {open && (
+        <div className="field-grid">
+          <Field label={`Policy YAML`}>
+            <textarea
+              placeholder={"rules:\n  - require_ssh_key_only\n  - forbid_root_login"}
+              value={policyYAML}
+              onChange={(event) => {
+                setPolicyYAML(event.target.value);
+                setResult(null);
+                setPolicyError("");
+              }}
+            />
+          </Field>
+          <div className="toolbar-actions">
+            <button
+              className="secondary-action"
+              disabled={checking || !policyYAML.trim()}
+              onClick={() => void handleCheck()}
+              type="button"
+            >
+              {checking ? "Checking…" : "Check Policy"}
+            </button>
+          </div>
+          {policyError && (
+            <span className="inline-error">Policy check requires backend: {policyError}</span>
+          )}
+          {result && (
+            <div>
+              {result.Passed ? (
+                <span style={{ color: "green" }}>&#10003; Policy passed</span>
+              ) : (
+                <ul>
+                  {result.Violations.map((v) => (
+                    <li className="inline-error" key={`${v.Rule}-${v.Message}`}>
+                      {v.Rule}: {v.Message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

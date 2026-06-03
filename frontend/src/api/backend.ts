@@ -137,6 +137,43 @@ export interface ImportResult {
   Warnings: string[];
 }
 
+export interface VersionEntry {
+  hash: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface PolicyViolation {
+  Rule: string;
+  Message: string;
+}
+
+export interface PolicyCheckResult {
+  Passed: boolean;
+  Violations: PolicyViolation[];
+}
+
+export interface PolicySnapshot {
+  OSFamily: string;
+  SSHPasswordAuth: boolean;
+  SSHPermitRootLogin: boolean;
+  DiskConfirmDestructive: boolean;
+  Users: string[];
+  Packages: string[];
+  PackagePresets: string[];
+}
+
+export type EntryKind = "netboot" | "local-profile" | "local-image" | "shell" | "reboot";
+
+export interface MenuEntry {
+  Kind: EntryKind;
+  Label: string;
+  URL: string;
+  Kernel: string;
+  Initrd: string;
+  Cmdline: string;
+}
+
 export interface CPUInfo {
   Model: string;
   Cores: number;
@@ -167,11 +204,13 @@ interface AppService {
   ListImages(): Promise<CatalogueEntry[]>;
   GetImage(id: string): Promise<CatalogueEntry>;
   ImageCacheStatus(id: string, version: string, arch: string): Promise<CacheStatus>;
+  DownloadImage(id: string, version: string, arch: string): Promise<string>;
   ListDevices(): Promise<UsbDevice[]>;
   GetDevice(path: string): Promise<UsbDevice>;
   LoadProfile(path: string): Promise<Profile>;
   OpenInNeovim(path: string, readOnly: boolean): Promise<void>;
   PlanFlash(devicePath: string, imagePath: string): Promise<FlashPlan>;
+  PlanPartitionFlash(devicePath: string, partitionPath: string, imagePath: string): Promise<FlashPlan>;
   ExecuteFlash(plan: FlashPlan): Promise<void>;
   PlanMediaBuild(recipeYAML: string, devicePath: string): Promise<BuildPlan>;
   FormatMediaBuildPlan(plan: BuildPlan): Promise<string>;
@@ -183,6 +222,7 @@ interface AppService {
   ListPackagePresets(): Promise<PackagePreset[]>;
   ListRolePresets(): Promise<RolePreset[]>;
   ExpandPackagePresets(names: string[], osFamily: string): Promise<string[]>;
+  ExpandRolePreset(name: string, osFamily: string): Promise<[string[], string[], string[]]>;
   LabStart(profileName: string, memorymb: number, cpus: number): Promise<LabRun>;
   LabStop(runID: string): Promise<void>;
   LabStatus(runID: string): Promise<LabRun>;
@@ -191,9 +231,24 @@ interface AppService {
   LabListRuns(): Promise<LabRun[]>;
   LabListSnapshots(runID: string): Promise<string[]>;
   LabCreateSnapshot(runID: string, name: string): Promise<void>;
+  LabRevertSnapshot(runID: string, name: string): Promise<void>;
+  LabDeleteSnapshot(runID: string, name: string): Promise<void>;
+  LibraryGet(name: string): Promise<Profile>;
+  LibraryList(): Promise<{ name: string }[]>;
+  LibraryExportBundle(name: string, path: string): Promise<void>;
+  LibraryImportBundle(path: string): Promise<string>;
+  LibraryCommit(name: string, message: string): Promise<void>;
+  LibraryHistory(name: string): Promise<VersionEntry[]>;
+  LibraryRestoreVersion(name: string, hash: string): Promise<void>;
+  LibraryDiff(name: string, fromHash: string, toHash: string): Promise<string>;
   ImportConfig(content: string): Promise<ImportResult>;
   DetectConfigFormat(content: string): Promise<string>;
   GatherHostInfo(): Promise<HostInfo>;
+  CheckPolicy(policyYAML: string, snap: PolicySnapshot): Promise<PolicyCheckResult>;
+  WriteTextFile(path: string, content: string): Promise<void>;
+  ReadRenderedFile(path: string): Promise<string>;
+  RenderIPXEMenu(title: string, entries: MenuEntry[]): Promise<string>;
+  RenderGRUBMenu(title: string, entries: MenuEntry[]): Promise<string>;
 }
 
 declare global {
@@ -284,6 +339,14 @@ export async function imageCacheStatus(
   return requireService().ImageCacheStatus(id, version, arch);
 }
 
+export async function downloadImage(
+  id: string,
+  version: string,
+  arch: string,
+): Promise<string> {
+  return requireService().DownloadImage(id, version, arch);
+}
+
 export async function listDevices(): Promise<UsbDevice[]> {
   const service = getService();
   if (!service) return [];
@@ -299,6 +362,14 @@ export async function planFlash(
   imagePath: string,
 ): Promise<FlashPlan> {
   return requireService().PlanFlash(devicePath, imagePath);
+}
+
+export async function planPartitionFlash(
+  devicePath: string,
+  partitionPath: string,
+  imagePath: string,
+): Promise<FlashPlan> {
+  return requireService().PlanPartitionFlash(devicePath, partitionPath, imagePath);
 }
 
 export async function executeFlash(plan: FlashPlan): Promise<void> {
@@ -335,6 +406,13 @@ export async function expandPackagePresets(
   const service = getService();
   if (!service) return [];
   return service.ExpandPackagePresets(names, osFamily);
+}
+
+export async function expandRolePreset(
+  name: string,
+  osFamily: string,
+): Promise<[string[], string[], string[]]> {
+  return requireService().ExpandRolePreset(name, osFamily);
 }
 
 export async function labStart(
@@ -375,6 +453,48 @@ export async function labCreateSnapshot(runID: string, name: string): Promise<vo
   return requireService().LabCreateSnapshot(runID, name);
 }
 
+export async function labRevertSnapshot(runID: string, name: string): Promise<void> {
+  return requireService().LabRevertSnapshot(runID, name);
+}
+
+export async function labDeleteSnapshot(runID: string, name: string): Promise<void> {
+  return requireService().LabDeleteSnapshot(runID, name);
+}
+
+export async function libraryGet(name: string): Promise<Profile> {
+  return requireService().LibraryGet(name);
+}
+
+export async function libraryList(): Promise<{ name: string }[]> {
+  const service = getService();
+  if (!service) return [];
+  return service.LibraryList();
+}
+
+export async function libraryCommit(name: string, message: string): Promise<void> {
+  return requireService().LibraryCommit(name, message);
+}
+
+export async function libraryHistory(name: string): Promise<VersionEntry[]> {
+  return requireService().LibraryHistory(name);
+}
+
+export async function libraryRestoreVersion(name: string, hash: string): Promise<void> {
+  return requireService().LibraryRestoreVersion(name, hash);
+}
+
+export async function libraryDiff(name: string, fromHash: string, toHash: string): Promise<string> {
+  return requireService().LibraryDiff(name, fromHash, toHash);
+}
+
+export async function libraryExportBundle(name: string, path: string): Promise<void> {
+  return requireService().LibraryExportBundle(name, path);
+}
+
+export async function libraryImportBundle(path: string): Promise<string> {
+  return requireService().LibraryImportBundle(path);
+}
+
 export async function importConfig(content: string): Promise<ImportResult> {
   return requireService().ImportConfig(content);
 }
@@ -396,6 +516,26 @@ export async function gatherHostInfo(): Promise<HostInfo> {
     };
   }
   return service.GatherHostInfo();
+}
+
+export async function checkPolicy(policyYAML: string, snap: PolicySnapshot): Promise<PolicyCheckResult> {
+  return requireService().CheckPolicy(policyYAML, snap);
+}
+
+export async function writeTextFile(path: string, content: string): Promise<void> {
+  return requireService().WriteTextFile(path, content);
+}
+
+export async function readRenderedFile(path: string): Promise<string> {
+  return requireService().ReadRenderedFile(path);
+}
+
+export async function renderIPXEMenu(title: string, entries: MenuEntry[]): Promise<string> {
+  return requireService().RenderIPXEMenu(title, entries);
+}
+
+export async function renderGRUBMenu(title: string, entries: MenuEntry[]): Promise<string> {
+  return requireService().RenderGRUBMenu(title, entries);
 }
 
 function getService(): AppService | undefined {
