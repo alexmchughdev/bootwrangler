@@ -1539,6 +1539,82 @@ p {
   margin-bottom: 2px;
 }
 
+/* Package preset picker */
+.preset-browse-toggle {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 4px 10px;
+  border: 1px solid #284b70;
+  border-radius: 4px;
+  color: #7dd3fc;
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.preset-browse-toggle:hover {
+  border-color: #38bdf8;
+  color: #e0f2fe;
+}
+
+.preset-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #1e3551;
+  border-radius: 6px;
+  background: #0b1728;
+  margin-top: 4px;
+}
+
+.preset-loading {
+  font-size: 12px;
+  color: #5a7a9d;
+}
+
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid #284b70;
+  border-radius: 4px;
+  color: #93c5fd;
+  background: #0d1b2d;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.preset-chip:hover:not(:disabled) {
+  border-color: #38bdf8;
+  background: #0e2a44;
+  color: #e0f2fe;
+}
+
+.preset-chip--applied,
+.preset-chip:disabled {
+  border-color: #1e3551;
+  color: #4a6a8d;
+  background: #071420;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.preset-chip-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid #166534;
+  border-radius: 3px;
+  color: #86efac;
+  background: #0d251d;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 /* Import page */
 .import-page {
   display: flex;
@@ -1656,4 +1732,52 @@ p {
 
 .import-unsupported-list li {
   margin-bottom: 3px;
+}
+
+/* Host Inspection */
+.host-inspection {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.host-inspection-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.host-inspection-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.host-cpu-meta {
+  display: flex;
+  gap: 24px;
+  margin-top: 12px;
+}
+
+.host-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.host-meta-item .panel-label {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.host-iface-table {
+  margin-top: 14px;
+}
+
+.host-hwaddr {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  color: #5a7a9d;
 }

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { getHealth, listDevices, type HealthStatus } from "./api/backend";
+import type { Profile } from "./types/profile";
 import { navigationItems } from "./navigation";
 import FlashImage from "./pages/FlashImage";
 import FlashPartition from "./pages/FlashPartition";
+import HostInspection from "./pages/HostInspection";
 import Images from "./pages/Images";
 import Import from "./pages/Import";
 import Lab from "./pages/Lab";
@@ -24,14 +26,22 @@ function App() {
   const [health, setHealth] = useState(initialHealth);
   const [profileEditorKey, setProfileEditorKey] = useState(0);
   const [libraryKey, setLibraryKey] = useState(0);
+  const [importedProfile, setImportedProfile] = useState<Profile | undefined>();
 
   useEffect(() => {
     void getHealth().then(setHealth);
   }, []);
 
   function handleNewProfile() {
+    setImportedProfile(undefined);
     setActiveSection("Profiles");
     setProfileEditorKey((value) => value + 1);
+  }
+
+  function handleOpenImported(profile: Profile) {
+    setImportedProfile(profile);
+    setActiveSection("Profiles");
+    setProfileEditorKey((k) => k + 1);
   }
 
   return (
@@ -79,7 +89,7 @@ function App() {
         </header>
 
         {activeSection === "Profiles" ? (
-          <ProfileEditor key={profileEditorKey} />
+          <ProfileEditor key={profileEditorKey} initialProfile={importedProfile} />
         ) : activeSection === "Library" ? (
           <ProfileLibrary
             key={libraryKey}
@@ -100,12 +110,14 @@ function App() {
           <FlashPartition />
         ) : activeSection === "USB Devices" ? (
           <USBDevices />
+        ) : activeSection === "Host Info" ? (
+          <HostInspection />
         ) : activeSection === "Media Builder" ? (
           <MediaBuilder />
         ) : activeSection === "Lab" ? (
           <Lab />
         ) : activeSection === "Import" ? (
-          <Import onNavigate={setActiveSection} />
+          <Import onNavigate={setActiveSection} onOpenInEditor={handleOpenImported} />
         ) : activeSection === "Settings" ? (
           <Settings />
         ) : (

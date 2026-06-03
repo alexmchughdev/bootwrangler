@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { detectConfigFormat, importConfig, type ImportResult } from "../api/backend";
+import type { Profile } from "../types/profile";
 
 interface Props {
   onNavigate: (section: string) => void;
+  onOpenInEditor?: (profile: Profile) => void;
 }
 
-export default function Import({ onNavigate }: Props) {
+export default function Import({ onNavigate, onOpenInEditor }: Props) {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -117,9 +119,15 @@ export default function Import({ onNavigate }: Props) {
               )}
 
               <button
-                className="secondary-action"
+                className="primary-action"
                 type="button"
-                onClick={() => onNavigate("Profiles")}
+                onClick={() => {
+                  if (onOpenInEditor) {
+                    onOpenInEditor(result.Profile as unknown as Profile);
+                  } else {
+                    onNavigate("Profiles");
+                  }
+                }}
               >
                 Open in Profile Editor
               </button>
