@@ -1,0 +1,45 @@
+name: multi-image-usb
+
+device:
+  partition_table: gpt
+
+boot:
+  mode: uefi-bios
+  menu: ipxe
+
+partitions:
+  - label: BOOTFORGE
+    size: 2G
+    filesystem: fat32
+    content:
+      type: boot-menu
+
+  - label: UBUNTU_24
+    size: 6G
+    filesystem: exfat
+    content:
+      type: catalogue-image
+      image: ubuntu-server
+      version: "24.04"
+
+  - label: DEBIAN_12
+    size: 4G
+    filesystem: exfat
+    content:
+      type: catalogue-image
+      image: debian-netinst
+      version: "12"
+
+  - label: ALPINE
+    size: 2G
+    filesystem: exfat
+    content:
+      type: catalogue-image
+      image: alpine-standard
+      version: "3.19"
+
+  - label: STORAGE
+    size: remaining
+    filesystem: exfat
+    content:
+      type: empty

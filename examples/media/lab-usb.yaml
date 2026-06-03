@@ -1,0 +1,36 @@
+name: lab-usb
+
+device:
+  partition_table: gpt
+
+boot:
+  mode: uefi-bios
+  menu: ipxe
+
+partitions:
+  - label: BOOTFORGE
+    size: 2G
+    filesystem: fat32
+    content:
+      type: boot-menu
+
+  - label: UBUNTU_ISO
+    size: 6G
+    filesystem: exfat
+    content:
+      type: catalogue-image
+      image: ubuntu-server
+      version: "24.04"
+
+  - label: ALPINE_AUTO
+    size: 2G
+    filesystem: fat32
+    content:
+      type: rendered-profile
+      profile: alpine-edge-node
+
+  - label: STORAGE
+    size: remaining
+    filesystem: exfat
+    content:
+      type: empty
