@@ -1,9 +1,127 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  labCreateSnapshot,
+  labListRuns,
+  labListSnapshots,
+  labSSHCommand,
+  labSerialLog,
+  labStart,
+  labStop,
+  type LabRun,
+} from "../api/backend";
 
 export default function Lab() {
   const [profile, setProfile] = useState("");
   const [memory, setMemory] = useState("2048");
   const [cpus, setCpus] = useState("2");
+  const [activeRuns, setActiveRuns] = useState<LabRun[]>([]);
+  const [error, setError] = useState("");
+  const [selectedRunID, setSelectedRunID] = useState<string | null>(null);
+  const [consoleLog, setConsoleLog] = useState("");
+  const [snapshotNames, setSnapshotNames] = useState<Record<string, string>>({});
+  const [snapshotLists, setSnapshotLists] = useState<Record<string, string[]>>({});
+  const consoleRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    labListRuns()
+      .then(setActiveRuns)
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err));
+      });
+  }, []);
+
+  async function handleStart() {
+    setError("");
+    try {
+      const run = await labStart(profile, parseInt(memory, 10), parseInt(cpus, 10));
+      setActiveRuns((prev) => [...prev, run]);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleStop(runID: string) {
+    setError("");
+    try {
+      await labStop(runID);
+      setActiveRuns((prev) =>
+        prev.map((r) => (r.ID === runID ? { ...r, State: "stopped" } : r)),
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleConsole(runID: string) {
+    setError("");
+    setSelectedRunID(runID);
+    try {
+      const log = await labSerialLog(runID);
+      setConsoleLog(log);
+      consoleRef.current?.scrollIntoView({ behavior: "smooth" });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleRefreshConsole() {
+    if (!selectedRunID) return;
+    setError("");
+    try {
+      const log = await labSerialLog(selectedRunID);
+      setConsoleLog(log);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleSSHCommand(runID: string) {
+    setError("");
+    try {
+      const cmd = await labSSHCommand(runID, "root");
+      await navigator.clipboard.writeText(cmd);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleCreateSnapshot(runID: string) {
+    setError("");
+    const name = snapshotNames[runID] ?? "";
+    if (!name.trim()) {
+      setError("Snapshot name cannot be empty.");
+      return;
+    }
+    try {
+      await labCreateSnapshot(runID, name.trim());
+      setSnapshotNames((prev) => ({ ...prev, [runID]: "" }));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleListSnapshots(runID: string) {
+    setError("");
+    try {
+      const snaps = await labListSnapshots(runID);
+      setSnapshotLists((prev) => ({ ...prev, [runID]: snaps }));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  function stateClass(state: string): string {
+    switch (state) {
+      case "running":
+        return "lab-state-badge lab-state-running";
+      case "stopped":
+        return "lab-state-badge lab-state-stopped";
+      case "failed":
+        return "lab-state-badge lab-state-failed";
+      default:
+        return "lab-state-badge lab-state-pending";
+    }
+  }
 
   return (
     <div className="lab-page">
@@ -15,6 +133,8 @@ export default function Lab() {
           to hardware. Each VM runs in isolation and is discarded when stopped.
         </p>
       </div>
+
+      {error && <p className="render-error">{error}</p>}
 
       <div className="lab-columns">
         <div className="lab-left">
@@ -49,8 +169,8 @@ export default function Lab() {
               <button
                 className="primary-action lab-start-btn"
                 type="button"
-                disabled
-                title="Backend wiring not yet available"
+                onClick={() => void handleStart()}
+                disabled={!profile.trim()}
               >
                 Start VM
               </button>
@@ -61,9 +181,9 @@ export default function Lab() {
             <span className="panel-label">Requirements</span>
             <strong className="lab-req-title">QEMU is required</strong>
             <p>
-              The lab feature requires <code className="inline-code">qemu-system-x86_64</code>{" "}
-              to be installed and available on your PATH. Install it with your system package
-              manager:
+              The lab feature requires{" "}
+              <code className="inline-code">qemu-system-x86_64</code> to be installed and
+              available on your PATH. Install it with your system package manager:
             </p>
             <pre className="lab-install-hint">{`# Debian / Ubuntu
 sudo apt install qemu-system-x86
@@ -79,24 +199,126 @@ sudo pacman -S qemu-full`}</pre>
         <div className="lab-right">
           <div className="panel lab-vms-panel">
             <span className="panel-label">Active VMs</span>
-            <p className="library-empty">
-              No active VMs. Start one using the form above.
-            </p>
+            {activeRuns.length === 0 ? (
+              <p className="library-empty">No active VMs. Start one using the form above.</p>
+            ) : (
+              <div className="lab-vm-list">
+                {activeRuns.map((run) => (
+                  <div key={run.ID} className="lab-vm-card">
+                    <div className="lab-vm-header">
+                      <div className="lab-vm-title">
+                        <code className="inline-code">{run.ID.slice(0, 8)}</code>
+                        <span className="lab-vm-profile">{run.ProfileName}</span>
+                      </div>
+                      <span className={stateClass(run.State)}>{run.State}</span>
+                    </div>
+                    <div className="lab-vm-ports">
+                      <span>SSH: {run.SSHPort}</span>
+                      <span>VNC: {run.VNCPort}</span>
+                    </div>
+                    {run.Error && <p className="render-error lab-vm-error">{run.Error}</p>}
+                    <div className="lab-vm-actions">
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        onClick={() => void handleStop(run.ID)}
+                        disabled={run.State === "stopped" || run.State === "failed"}
+                      >
+                        Stop
+                      </button>
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        onClick={() => void handleConsole(run.ID)}
+                      >
+                        Console
+                      </button>
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        onClick={() => void handleSSHCommand(run.ID)}
+                        title="Copy SSH command to clipboard"
+                      >
+                        SSH Command
+                      </button>
+                    </div>
+                    <div className="lab-snapshot-section">
+                      <span className="lab-snapshot-label">Snapshots</span>
+                      <div className="lab-snapshot-row">
+                        <input
+                          type="text"
+                          placeholder="Snapshot name"
+                          value={snapshotNames[run.ID] ?? ""}
+                          onChange={(e) =>
+                            setSnapshotNames((prev) => ({
+                              ...prev,
+                              [run.ID]: e.target.value,
+                            }))
+                          }
+                        />
+                        <button
+                          className="secondary-action"
+                          type="button"
+                          onClick={() => void handleCreateSnapshot(run.ID)}
+                        >
+                          Create
+                        </button>
+                        <button
+                          className="secondary-action"
+                          type="button"
+                          onClick={() => void handleListSnapshots(run.ID)}
+                        >
+                          List
+                        </button>
+                      </div>
+                      {snapshotLists[run.ID] && (
+                        <ul className="lab-snapshot-list">
+                          {snapshotLists[run.ID].length === 0 ? (
+                            <li className="library-empty">No snapshots.</li>
+                          ) : (
+                            snapshotLists[run.ID].map((snap) => (
+                              <li key={snap}>
+                                <code className="inline-code">{snap}</code>
+                              </li>
+                            ))
+                          )}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="panel lab-console-panel">
-            <span className="panel-label">Serial Console</span>
+          <div className="panel lab-console-panel" ref={consoleRef}>
+            <div className="lab-console-header">
+              <span className="panel-label">Serial Console</span>
+              {selectedRunID && (
+                <span className="lab-console-run-id">
+                  Selected run: <code className="inline-code">{selectedRunID.slice(0, 8)}</code>
+                </span>
+              )}
+              <button
+                className="secondary-action"
+                type="button"
+                onClick={() => void handleRefreshConsole()}
+                disabled={!selectedRunID}
+              >
+                Refresh
+              </button>
+            </div>
             <textarea
               className="lab-console"
               readOnly
-              value="Serial console output will appear here once a VM is running."
+              value={
+                consoleLog ||
+                (selectedRunID
+                  ? ""
+                  : "Select a VM and click Console to load serial output.")
+              }
               spellCheck={false}
             />
-          </div>
-
-          <div className="panel lab-snapshots-panel">
-            <span className="panel-label">Snapshots</span>
-            <p className="library-empty">Select a running VM to manage snapshots.</p>
           </div>
         </div>
       </div>

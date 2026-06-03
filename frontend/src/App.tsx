@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
-import { getHealth, type HealthStatus } from "./api/backend";
+import { getHealth, listDevices, type HealthStatus } from "./api/backend";
 import { navigationItems } from "./navigation";
 import FlashImage from "./pages/FlashImage";
 import FlashPartition from "./pages/FlashPartition";
 import Images from "./pages/Images";
+import Import from "./pages/Import";
 import Lab from "./pages/Lab";
 import MediaBuilder from "./pages/MediaBuilder";
 import ProfileEditor from "./pages/ProfileEditor";
 import ProfileLibrary from "./pages/ProfileLibrary";
 import ProvisioningServer from "./pages/ProvisioningServer";
 import RenderPreview from "./pages/RenderPreview";
+import Settings from "./pages/Settings";
 import USBDevices from "./pages/USBDevices";
 
 const initialHealth: HealthStatus = {
@@ -102,6 +104,10 @@ function App() {
           <MediaBuilder />
         ) : activeSection === "Lab" ? (
           <Lab />
+        ) : activeSection === "Import" ? (
+          <Import onNavigate={setActiveSection} />
+        ) : activeSection === "Settings" ? (
+          <Settings />
         ) : (
           <Dashboard />
         )}
@@ -110,7 +116,37 @@ function App() {
   );
 }
 
+interface LibraryService {
+  LibraryList(): Promise<unknown[]>;
+}
+
+interface ServerAddrService {
+  ServerAddr(): Promise<string>;
+}
+
 function Dashboard() {
+  const [profileCount, setProfileCount] = useState<number | null>(null);
+  const [deviceCount, setDeviceCount] = useState<number | null>(null);
+  const [serverRunning, setServerRunning] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const libSvc = window.go?.app?.Service as unknown as LibraryService | undefined;
+    if (libSvc?.LibraryList) {
+      void libSvc.LibraryList().then((list) => setProfileCount(list.length)).catch(() => {});
+    }
+
+    void listDevices().then((devices) => setDeviceCount(devices.length)).catch(() => {});
+
+    const serverSvc = window.go?.app?.Service as unknown as ServerAddrService | undefined;
+    if (serverSvc?.ServerAddr) {
+      void serverSvc.ServerAddr().then((addr) => setServerRunning(!!addr)).catch(() => {});
+    }
+  }, []);
+
+  const profileLabel = profileCount !== null ? String(profileCount) : "—";
+  const deviceLabel = deviceCount !== null ? String(deviceCount) : "—";
+  const serverLabel = serverRunning === null ? "—" : serverRunning ? "Running" : "Stopped";
+
   return (
         <div className="dashboard-grid">
           <article className="panel panel-wide">
@@ -124,19 +160,19 @@ function Dashboard() {
 
           <article className="panel">
             <span className="panel-label">Profiles</span>
-            <strong>0</strong>
+            <strong>{profileLabel}</strong>
             <p>Local profiles</p>
           </article>
 
           <article className="panel">
             <span className="panel-label">USB Devices</span>
-            <strong>0</strong>
+            <strong>{deviceLabel}</strong>
             <p>Connected targets</p>
           </article>
 
           <article className="panel">
             <span className="panel-label">Provisioning Server</span>
-            <strong>Stopped</strong>
+            <strong>{serverLabel}</strong>
             <p>No build root selected</p>
           </article>
         </div>

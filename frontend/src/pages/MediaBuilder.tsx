@@ -1,30 +1,36 @@
 import { useState } from "react";
+import { formatMediaBuildPlan, listDevices, planMediaBuild } from "../api/backend";
 
 const YAML_PLACEHOLDER = `# Recipe YAML format:
 # label: my-usb-stick
+# partition_table: gpt
 # partitions:
 #   - label: efi
-#     fs: fat32
-#     size: 512M
-#     content: ./efi-files/
+#     filesystem: fat32
+#     size: 512MiB
+#     content_type: efi
 #   - label: ubuntu
-#     fs: ext4
-#     size: 8G
-#     image: ./ubuntu-24.04.iso
+#     filesystem: ext4
+#     size: 8GiB
+#     content_type: installer-assets
+#     source: ./ubuntu-server/
 #   - label: data
-#     fs: exfat
-#     size: fill`;
+#     filesystem: ext4
+#     size: remaining
+#     content_type: data`;
 
 type PlanState =
   | { kind: "idle" }
+  | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "info"; message: string };
+  | { kind: "plan"; text: string };
 
 export default function MediaBuilder() {
   const [yaml, setYaml] = useState("");
+  const [devicePath, setDevicePath] = useState("/dev/sdb");
   const [plan, setPlan] = useState<PlanState>({ kind: "idle" });
 
-  function handleValidate() {
+  async function handleValidate() {
     if (yaml.trim() === "") {
       setPlan({ kind: "error", message: "Recipe is empty. Paste or type a YAML recipe first." });
       return;
@@ -32,16 +38,31 @@ export default function MediaBuilder() {
     if (!yaml.includes("partitions:")) {
       setPlan({
         kind: "error",
-        message:
-          'Invalid recipe: missing required "partitions:" key. Check your YAML structure.',
+        message: 'Invalid recipe: missing required "partitions:" key.',
       });
       return;
     }
-    setPlan({
-      kind: "info",
-      message:
-        "Plan preview not available in this release; use the CLI:\n\n  bootwrangler recipe plan <recipe.yaml>",
-    });
+
+    setPlan({ kind: "loading" });
+    try {
+      const builtPlan = await planMediaBuild(yaml, devicePath);
+      const text = await formatMediaBuildPlan(builtPlan);
+      setPlan({ kind: "plan", text });
+    } catch (err) {
+      setPlan({ kind: "error", message: String(err) });
+    }
+  }
+
+  async function handleLoadDevices() {
+    try {
+      const devices = await listDevices();
+      const removable = devices.find((d) => d.Safe && d.Removable);
+      if (removable) {
+        setDevicePath(removable.Path);
+      }
+    } catch {
+      // ignore
+    }
   }
 
   return (
@@ -57,13 +78,28 @@ export default function MediaBuilder() {
         </p>
       </div>
 
+      <div className="media-builder-device-row panel">
+        <span className="panel-label">Target Device</span>
+        <div className="media-builder-device-input">
+          <input
+            type="text"
+            className="field-input"
+            value={devicePath}
+            onChange={(e) => setDevicePath(e.target.value)}
+            placeholder="/dev/sdb"
+          />
+          <button className="secondary-action" type="button" onClick={() => void handleLoadDevices()}>
+            Auto-detect
+          </button>
+        </div>
+        <p className="media-builder-hint">
+          Block device path. The planner needs the device size to validate partition totals.
+        </p>
+      </div>
+
       <div className="media-builder-panels">
         <div className="panel media-builder-input">
           <span className="panel-label">Recipe YAML</span>
-          <p className="media-builder-hint">
-            Paste an existing recipe or write one from scratch. The recipe must contain a{" "}
-            <code className="inline-code">partitions:</code> key with at least one partition entry.
-          </p>
           <textarea
             className="media-builder-textarea"
             placeholder={YAML_PLACEHOLDER}
@@ -72,8 +108,13 @@ export default function MediaBuilder() {
             spellCheck={false}
           />
           <div className="media-builder-actions">
-            <button className="primary-action" type="button" onClick={handleValidate}>
-              Validate &amp; Plan
+            <button
+              className="primary-action"
+              type="button"
+              onClick={() => void handleValidate()}
+              disabled={plan.kind === "loading"}
+            >
+              {plan.kind === "loading" ? "Planning…" : "Validate & Plan"}
             </button>
             {yaml.trim() !== "" && (
               <button
@@ -97,11 +138,12 @@ export default function MediaBuilder() {
               Enter a recipe and click "Validate &amp; Plan" to see the partition plan.
             </p>
           )}
+          {plan.kind === "loading" && <p className="library-empty">Planning…</p>}
           {plan.kind === "error" && (
             <p className="render-error media-builder-result-text">{plan.message}</p>
           )}
-          {plan.kind === "info" && (
-            <pre className="media-builder-plan-output">{plan.message}</pre>
+          {plan.kind === "plan" && (
+            <pre className="media-builder-plan-output">{plan.text}</pre>
           )}
         </div>
       </div>

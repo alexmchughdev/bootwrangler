@@ -52,7 +52,8 @@ export default function RenderPreview() {
     }
 
     try {
-      const result = await renderProfile(profile, outDir.trim() || ".");
+      const serverBaseURL = localStorage.getItem("bw_server_base_url") ?? "";
+      const result = await renderProfile(profile, outDir.trim() || ".", serverBaseURL);
       setManifest(result);
       setState("done");
     } catch (err) {

@@ -8,6 +8,7 @@ export const navigationItems = [
   "Flash Partition",
   "Media Builder",
   "Lab",
+  "Import",
   "USB Devices",
   "Provisioning Server",
   "Settings",

@@ -92,6 +92,51 @@ export interface FlashPlan {
   DryRun: boolean;
 }
 
+export interface BuildPlan {
+  RecipeName: string;
+  DevicePath: string;
+  DeviceSize: number;
+  TotalBytes: number;
+  Actions: Array<{
+    Label: string;
+    SizeBytes: number;
+    Filesystem: string;
+    DevicePath: string;
+  }>;
+  DryRun: boolean;
+}
+
+export interface PackagePreset {
+  Name: string;
+  Description: string;
+  Packages: Record<string, string[]>;
+}
+
+export interface RolePreset {
+  Name: string;
+  Description: string;
+  Packages: string[];
+  Services: string[];
+  Groups: string[];
+}
+
+export interface LabRun {
+  ID: string;
+  ProfileName: string;
+  State: string; // "pending" | "running" | "stopped" | "failed"
+  SSHPort: number;
+  VNCPort: number;
+  SerialLog: string;
+  DiskPath: string;
+  Error: string;
+}
+
+export interface ImportResult {
+  Profile: Profile;
+  UnsupportedFields: string[];
+  Warnings: string[];
+}
+
 interface AppService {
   AvailableRenderers(): Promise<string[]>;
   Health(): Promise<HealthStatus>;
@@ -104,11 +149,26 @@ interface AppService {
   OpenInNeovim(path: string, readOnly: boolean): Promise<void>;
   PlanFlash(devicePath: string, imagePath: string): Promise<FlashPlan>;
   ExecuteFlash(plan: FlashPlan): Promise<void>;
-  RenderProfile(value: Profile, outDir: string): Promise<RenderManifest>;
+  PlanMediaBuild(recipeYAML: string, devicePath: string): Promise<BuildPlan>;
+  FormatMediaBuildPlan(plan: BuildPlan): Promise<string>;
+  RenderProfile(value: Profile, outDir: string, serverBaseURL: string): Promise<RenderManifest>;
   SaveProfile(path: string, value: Profile): Promise<void>;
   ValidateProfile(value: Profile): Promise<ValidationResult>;
   ValidateSSHPublicKey(value: string): Promise<ValidationResult>;
   Version(): Promise<string>;
+  ListPackagePresets(): Promise<PackagePreset[]>;
+  ListRolePresets(): Promise<RolePreset[]>;
+  ExpandPackagePresets(names: string[], osFamily: string): Promise<string[]>;
+  LabStart(profileName: string, memorymb: number, cpus: number): Promise<LabRun>;
+  LabStop(runID: string): Promise<void>;
+  LabStatus(runID: string): Promise<LabRun>;
+  LabSerialLog(runID: string): Promise<string>;
+  LabSSHCommand(runID: string, user: string): Promise<string>;
+  LabListRuns(): Promise<LabRun[]>;
+  LabListSnapshots(runID: string): Promise<string[]>;
+  LabCreateSnapshot(runID: string, name: string): Promise<void>;
+  ImportConfig(content: string): Promise<ImportResult>;
+  DetectConfigFormat(content: string): Promise<string>;
 }
 
 declare global {
@@ -176,8 +236,9 @@ export async function availableRenderers(): Promise<string[]> {
 export async function renderProfile(
   value: Profile,
   outDir: string,
+  serverBaseURL = "",
 ): Promise<RenderManifest> {
-  return requireService().RenderProfile(value, outDir);
+  return requireService().RenderProfile(value, outDir, serverBaseURL);
 }
 
 export async function listImages(): Promise<CatalogueEntry[]> {
@@ -217,6 +278,86 @@ export async function planFlash(
 
 export async function executeFlash(plan: FlashPlan): Promise<void> {
   return requireService().ExecuteFlash(plan);
+}
+
+export async function planMediaBuild(
+  recipeYAML: string,
+  devicePath: string,
+): Promise<BuildPlan> {
+  return requireService().PlanMediaBuild(recipeYAML, devicePath);
+}
+
+export async function formatMediaBuildPlan(plan: BuildPlan): Promise<string> {
+  return requireService().FormatMediaBuildPlan(plan);
+}
+
+export async function listPackagePresets(): Promise<PackagePreset[]> {
+  const service = getService();
+  if (!service) return [];
+  return service.ListPackagePresets();
+}
+
+export async function listRolePresets(): Promise<RolePreset[]> {
+  const service = getService();
+  if (!service) return [];
+  return service.ListRolePresets();
+}
+
+export async function expandPackagePresets(
+  names: string[],
+  osFamily: string,
+): Promise<string[]> {
+  const service = getService();
+  if (!service) return [];
+  return service.ExpandPackagePresets(names, osFamily);
+}
+
+export async function labStart(
+  profileName: string,
+  memorymb: number,
+  cpus: number,
+): Promise<LabRun> {
+  return requireService().LabStart(profileName, memorymb, cpus);
+}
+
+export async function labStop(runID: string): Promise<void> {
+  return requireService().LabStop(runID);
+}
+
+export async function labStatus(runID: string): Promise<LabRun> {
+  return requireService().LabStatus(runID);
+}
+
+export async function labSerialLog(runID: string): Promise<string> {
+  return requireService().LabSerialLog(runID);
+}
+
+export async function labSSHCommand(runID: string, user: string): Promise<string> {
+  return requireService().LabSSHCommand(runID, user);
+}
+
+export async function labListRuns(): Promise<LabRun[]> {
+  const service = getService();
+  if (!service) return [];
+  return service.LabListRuns();
+}
+
+export async function labListSnapshots(runID: string): Promise<string[]> {
+  return requireService().LabListSnapshots(runID);
+}
+
+export async function labCreateSnapshot(runID: string, name: string): Promise<void> {
+  return requireService().LabCreateSnapshot(runID, name);
+}
+
+export async function importConfig(content: string): Promise<ImportResult> {
+  return requireService().ImportConfig(content);
+}
+
+export async function detectConfigFormat(content: string): Promise<string> {
+  const service = getService();
+  if (!service) return "unknown";
+  return service.DetectConfigFormat(content);
 }
 
 function getService(): AppService | undefined {
