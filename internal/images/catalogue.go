@@ -1,11 +1,15 @@
 package images
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed catalogue.yaml
+var builtinCatalogueYAML []byte
 
 // LoadCatalogueFromBytes parses a catalogue from YAML bytes.
 func LoadCatalogueFromBytes(data []byte) (Catalogue, error) {
@@ -85,255 +89,51 @@ func FindImage(cat Catalogue, id, version, arch string) (CatalogueEntry, Version
 		fmt.Errorf("image not found: id=%s version=%s arch=%s", id, version, arch)
 }
 
+
 // BuiltinCatalogue returns the built-in catalogue of official OS images.
+// Data is sourced from the embedded catalogue.yaml, which is updated by the
+// update-catalogue GitHub Action to keep URLs current.
 func BuiltinCatalogue() Catalogue {
-	return Catalogue{
-		Entries: []CatalogueEntry{
-			{
-				ID:     "ubuntu-server",
-				Name:   "Ubuntu Server",
-				Family: "ubuntu",
-				Versions: []VersionEntry{
-					{
-						Version: "24.04",
-						Architectures: []ArchEntry{
-							{
-								Arch: "x86_64",
-								Images: []ArchImage{
-									{
-										Type:        ImageTypeISO,
-										URL:         "https://releases.ubuntu.com/24.04/ubuntu-24.04-live-server-amd64.iso",
-										ChecksumURL: "https://releases.ubuntu.com/24.04/SHA256SUMS",
-										Compatibility: Compatibility{
-											WholeDrive:  true,
-											Partition:   false,
-											ISOFileBoot: true,
-										},
-										BootMode: []BootMode{BootModeBIOS, BootModeUEFI},
-									},
-								},
-							},
-						},
-					},
-					{
-						Version: "22.04",
-						Architectures: []ArchEntry{
-							{
-								Arch: "x86_64",
-								Images: []ArchImage{
-									{
-										Type:        ImageTypeISO,
-										URL:         "https://releases.ubuntu.com/22.04/ubuntu-22.04.4-live-server-amd64.iso",
-										ChecksumURL: "https://releases.ubuntu.com/22.04/SHA256SUMS",
-										Compatibility: Compatibility{
-											WholeDrive:  true,
-											Partition:   false,
-											ISOFileBoot: true,
-										},
-										BootMode: []BootMode{BootModeBIOS, BootModeUEFI},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{
-				ID:     "ubuntu-desktop",
-				Name:   "Ubuntu Desktop",
-				Family: "ubuntu",
-				Versions: []VersionEntry{
-					{
-						Version: "24.04",
-						Architectures: []ArchEntry{
-							{
-								Arch: "x86_64",
-								Images: []ArchImage{
-									{
-										Type:        ImageTypeISO,
-										URL:         "https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso",
-										ChecksumURL: "https://releases.ubuntu.com/24.04/SHA256SUMS",
-										Compatibility: Compatibility{
-											WholeDrive:  true,
-											Partition:   false,
-											ISOFileBoot: true,
-										},
-										BootMode: []BootMode{BootModeBIOS, BootModeUEFI},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{
-				ID:     "debian-netinst",
-				Name:   "Debian Netinstall",
-				Family: "debian",
-				Versions: []VersionEntry{
-					{
-						Version: "12",
-						Architectures: []ArchEntry{
-							{
-								Arch: "x86_64",
-								Images: []ArchImage{
-									{
-										Type:        ImageTypeISO,
-										URL:         "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.5.0-amd64-netinst.iso",
-										ChecksumURL: "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS",
-										Compatibility: Compatibility{
-											WholeDrive:  true,
-											Partition:   false,
-											ISOFileBoot: true,
-										},
-										BootMode: []BootMode{BootModeBIOS, BootModeUEFI},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{
-				ID:     "fedora-server",
-				Name:   "Fedora Server",
-				Family: "fedora",
-				Versions: []VersionEntry{
-					{
-						Version: "40",
-						Architectures: []ArchEntry{
-							{
-								Arch: "x86_64",
-								Images: []ArchImage{
-									{
-										Type:        ImageTypeISO,
-										URL:         "https://download.fedoraproject.org/pub/fedora/linux/releases/40/Server/x86_64/iso/Fedora-Server-dvd-x86_64-40-1.14.iso",
-										ChecksumURL: "https://download.fedoraproject.org/pub/fedora/linux/releases/40/Server/x86_64/iso/Fedora-Server-40-1.14-x86_64-CHECKSUM",
-										Compatibility: Compatibility{
-											WholeDrive:  true,
-											Partition:   false,
-											ISOFileBoot: true,
-										},
-										BootMode: []BootMode{BootModeBIOS, BootModeUEFI},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{
-				ID:     "rocky-linux",
-				Name:   "Rocky Linux",
-				Family: "rocky",
-				Versions: []VersionEntry{
-					{
-						Version: "9",
-						Architectures: []ArchEntry{
-							{
-								Arch: "x86_64",
-								Images: []ArchImage{
-									{
-										Type:        ImageTypeISO,
-										URL:         "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.3-x86_64-dvd.iso",
-										ChecksumURL: "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/CHECKSUM",
-										Compatibility: Compatibility{
-											WholeDrive:  true,
-											Partition:   false,
-											ISOFileBoot: true,
-										},
-										BootMode: []BootMode{BootModeBIOS, BootModeUEFI},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{
-				ID:     "alpine-standard",
-				Name:   "Alpine Linux",
-				Family: "alpine",
-				Versions: []VersionEntry{
-					{
-						Version: "3.19",
-						Architectures: []ArchEntry{
-							{
-								Arch: "x86_64",
-								Images: []ArchImage{
-									{
-										Type:        ImageTypeISO,
-										URL:         "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-standard-3.19.1-x86_64.iso",
-										ChecksumURL: "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-standard-3.19.1-x86_64.iso.sha256",
-										Compatibility: Compatibility{
-											WholeDrive:  true,
-											Partition:   false,
-											ISOFileBoot: true,
-										},
-										BootMode: []BootMode{BootModeBIOS, BootModeUEFI},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{
-				ID:     "arch-linux",
-				Name:   "Arch Linux",
-				Family: "arch",
-				Versions: []VersionEntry{
-					{
-						Version: "2024.01",
-						Architectures: []ArchEntry{
-							{
-								Arch: "x86_64",
-								Images: []ArchImage{
-									{
-										Type:        ImageTypeISO,
-										URL:         "https://mirror.rackspace.com/archlinux/iso/2024.01.01/archlinux-2024.01.01-x86_64.iso",
-										ChecksumURL: "https://mirror.rackspace.com/archlinux/iso/2024.01.01/sha256sums.txt",
-										Compatibility: Compatibility{
-											WholeDrive:  true,
-											Partition:   false,
-											ISOFileBoot: true,
-										},
-										BootMode: []BootMode{BootModeBIOS, BootModeUEFI},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{
-				ID:     "opensuse-leap",
-				Name:   "openSUSE Leap",
-				Family: "opensuse",
-				Versions: []VersionEntry{
-					{
-						Version: "15.5",
-						Architectures: []ArchEntry{
-							{
-								Arch: "x86_64",
-								Images: []ArchImage{
-									{
-										Type:        ImageTypeISO,
-										URL:         "https://download.opensuse.org/distribution/leap/15.5/iso/openSUSE-Leap-15.5-DVD-x86_64-Media.iso",
-										ChecksumURL: "https://download.opensuse.org/distribution/leap/15.5/iso/openSUSE-Leap-15.5-DVD-x86_64-Media.iso.sha256",
-										Compatibility: Compatibility{
-											WholeDrive:  true,
-											Partition:   false,
-											ISOFileBoot: true,
-										},
-										BootMode: []BootMode{BootModeBIOS, BootModeUEFI},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
+	cat, err := LoadCatalogueFromBytes(builtinCatalogueYAML)
+	if err != nil {
+		panic(fmt.Sprintf("builtin catalogue: %v", err))
 	}
+	return cat
+}
+
+// NetbootImage is a distro entry that has direct PXE kernel/initrd URLs.
+type NetbootImage struct {
+	ID        string
+	Name      string
+	Family    string
+	Version   string
+	Arch      string
+	KernelURL string
+	InitrdURL string
+}
+
+// ListNetbootImages returns catalogue entries that have direct netboot kernel/initrd URLs.
+func ListNetbootImages(cat Catalogue) []NetbootImage {
+	var result []NetbootImage
+	for _, entry := range cat.Entries {
+		for _, ver := range entry.Versions {
+			for _, arch := range ver.Architectures {
+				for _, img := range arch.Images {
+					if img.NetbootKernelURL == "" {
+						continue
+					}
+					result = append(result, NetbootImage{
+						ID:        entry.ID,
+						Name:      entry.Name,
+						Family:    entry.Family,
+						Version:   ver.Version,
+						Arch:      arch.Arch,
+						KernelURL: img.NetbootKernelURL,
+						InitrdURL: img.NetbootInitrdURL,
+					})
+				}
+			}
+		}
+	}
+	return result
 }

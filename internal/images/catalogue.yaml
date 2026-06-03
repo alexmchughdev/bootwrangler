@@ -1,0 +1,160 @@
+entries:
+  - id: ubuntu-server
+    name: Ubuntu Server
+    family: ubuntu
+    versions:
+      - version: "24.04"
+        architectures:
+          - arch: x86_64
+            images:
+              - type: iso
+                url: https://releases.ubuntu.com/24.04/ubuntu-24.04-live-server-amd64.iso
+                checksum_url: https://releases.ubuntu.com/24.04/SHA256SUMS
+                compatibility:
+                  whole_drive: true
+                  partition: false
+                  iso_file_boot: true
+                boot_mode: [bios, uefi]
+                # Ubuntu 22.04+ dropped traditional netboot images; chain via netboot.xyz
+      - version: "22.04"
+        architectures:
+          - arch: x86_64
+            images:
+              - type: iso
+                url: https://releases.ubuntu.com/22.04/ubuntu-22.04.4-live-server-amd64.iso
+                checksum_url: https://releases.ubuntu.com/22.04/SHA256SUMS
+                compatibility:
+                  whole_drive: true
+                  partition: false
+                  iso_file_boot: true
+                boot_mode: [bios, uefi]
+
+  - id: ubuntu-desktop
+    name: Ubuntu Desktop
+    family: ubuntu
+    versions:
+      - version: "24.04"
+        architectures:
+          - arch: x86_64
+            images:
+              - type: iso
+                url: https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso
+                checksum_url: https://releases.ubuntu.com/24.04/SHA256SUMS
+                compatibility:
+                  whole_drive: true
+                  partition: false
+                  iso_file_boot: true
+                boot_mode: [bios, uefi]
+
+  - id: debian-netinst
+    name: Debian Netinstall
+    family: debian
+    versions:
+      - version: "12"
+        architectures:
+          - arch: x86_64
+            images:
+              - type: iso
+                url: https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.5.0-amd64-netinst.iso
+                checksum_url: https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS
+                compatibility:
+                  whole_drive: true
+                  partition: false
+                  iso_file_boot: true
+                boot_mode: [bios, uefi]
+                netboot_kernel_url: https://deb.debian.org/debian/dists/bookworm/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux
+                netboot_initrd_url: https://deb.debian.org/debian/dists/bookworm/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz
+
+  - id: fedora-server
+    name: Fedora Server
+    family: fedora
+    versions:
+      - version: "40"
+        architectures:
+          - arch: x86_64
+            images:
+              - type: iso
+                url: https://download.fedoraproject.org/pub/fedora/linux/releases/40/Server/x86_64/iso/Fedora-Server-dvd-x86_64-40-1.14.iso
+                checksum_url: https://download.fedoraproject.org/pub/fedora/linux/releases/40/Server/x86_64/iso/Fedora-Server-40-1.14-x86_64-CHECKSUM
+                compatibility:
+                  whole_drive: true
+                  partition: false
+                  iso_file_boot: true
+                boot_mode: [bios, uefi]
+                netboot_kernel_url: https://download.fedoraproject.org/pub/fedora/linux/releases/40/Server/x86_64/os/images/pxeboot/vmlinuz
+                netboot_initrd_url: https://download.fedoraproject.org/pub/fedora/linux/releases/40/Server/x86_64/os/images/pxeboot/initrd.img
+
+  - id: rocky-linux
+    name: Rocky Linux
+    family: rocky
+    versions:
+      - version: "9"
+        architectures:
+          - arch: x86_64
+            images:
+              - type: iso
+                url: https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.3-x86_64-dvd.iso
+                checksum_url: https://download.rockylinux.org/pub/rocky/9/isos/x86_64/CHECKSUM
+                compatibility:
+                  whole_drive: true
+                  partition: false
+                  iso_file_boot: true
+                boot_mode: [bios, uefi]
+                netboot_kernel_url: https://download.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/images/pxeboot/vmlinuz
+                netboot_initrd_url: https://download.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/images/pxeboot/initrd.img
+
+  - id: alpine-standard
+    name: Alpine Linux
+    family: alpine
+    versions:
+      - version: "3.19"
+        architectures:
+          - arch: x86_64
+            images:
+              - type: iso
+                url: https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-standard-3.19.1-x86_64.iso
+                checksum_url: https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-standard-3.19.1-x86_64.iso.sha256
+                compatibility:
+                  whole_drive: true
+                  partition: false
+                  iso_file_boot: true
+                boot_mode: [bios, uefi]
+                netboot_kernel_url: https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/netboot/vmlinuz-lts
+                netboot_initrd_url: https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/netboot/initramfs-lts
+
+  - id: arch-linux
+    name: Arch Linux
+    family: arch
+    versions:
+      - version: "2024.01"
+        architectures:
+          - arch: x86_64
+            images:
+              - type: iso
+                url: https://mirror.rackspace.com/archlinux/iso/2024.01.01/archlinux-2024.01.01-x86_64.iso
+                checksum_url: https://mirror.rackspace.com/archlinux/iso/2024.01.01/sha256sums.txt
+                compatibility:
+                  whole_drive: true
+                  partition: false
+                  iso_file_boot: true
+                boot_mode: [bios, uefi]
+                # Arch has no traditional netinstall kernel; use netboot.xyz
+
+  - id: opensuse-leap
+    name: openSUSE Leap
+    family: opensuse
+    versions:
+      - version: "15.5"
+        architectures:
+          - arch: x86_64
+            images:
+              - type: iso
+                url: https://download.opensuse.org/distribution/leap/15.5/iso/openSUSE-Leap-15.5-DVD-x86_64-Media.iso
+                checksum_url: https://download.opensuse.org/distribution/leap/15.5/iso/openSUSE-Leap-15.5-DVD-x86_64-Media.iso.sha256
+                compatibility:
+                  whole_drive: true
+                  partition: false
+                  iso_file_boot: true
+                boot_mode: [bios, uefi]
+                netboot_kernel_url: https://download.opensuse.org/distribution/leap/15.5/repo/oss/boot/x86_64/loader/linux
+                netboot_initrd_url: https://download.opensuse.org/distribution/leap/15.5/repo/oss/boot/x86_64/loader/initrd

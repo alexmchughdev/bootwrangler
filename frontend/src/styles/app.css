@@ -475,6 +475,38 @@ p {
   gap: 10px;
 }
 
+.render-netboot-panel {
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(14, 165, 233, 0.06);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  border-radius: 8px;
+}
+
+.render-netboot-snippet {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 12px;
+  background: #0a1220;
+  border: 1px solid #1e3a5f;
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  white-space: pre;
+  color: #7dd3fc;
+  margin: 10px 0;
+}
+
+.render-netboot-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.render-netboot-source {
+  font-size: 11px;
+  color: #5a7a9d;
+}
+
 .file-table {
   width: 100%;
   border-collapse: collapse;
@@ -2146,6 +2178,46 @@ p {
   gap: 10px;
   align-items: center;
   margin-top: 4px;
+}
+
+.boot-menu-autofill-row {
+  margin-bottom: 6px;
+}
+
+.boot-menu-autofill-panel {
+  background: rgba(14, 165, 233, 0.05);
+  border: 1px solid rgba(14, 165, 233, 0.15);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.boot-menu-autofill-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.boot-menu-autofill-btn {
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  border-radius: 5px;
+  color: #7dd3fc;
+  font-size: 12px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.boot-menu-autofill-btn:hover {
+  background: rgba(14, 165, 233, 0.2);
+}
+
+.boot-menu-autofill-empty {
+  font-size: 12px;
+  color: #5a7a9d;
+  margin: 0;
 }
 
 .boot-menu-output {

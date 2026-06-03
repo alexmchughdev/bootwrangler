@@ -1,0 +1,144 @@
+name: Update Distro Catalogue
+
+on:
+  schedule:
+    # Every Monday at 03:00 UTC (4am BST / 3am GMT)
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    name: Check and update distro URLs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check netboot.xyz latest release
+        id: netboot
+        run: |
+          LATEST=$(curl -sS https://api.github.com/repos/netbootxyz/netboot.xyz/releases/latest \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            | jq -r '.tag_name // empty')
+          echo "tag=${LATEST}" >> "$GITHUB_OUTPUT"
+          echo "Netboot.xyz latest release: ${LATEST}"
+
+      - name: Validate catalogue URLs
+        id: validate
+        run: |
+          set +e
+          FAILED=()
+          PASSED=0
+
+          check_url() {
+            local label="$1"
+            local url="$2"
+            local code
+            code=$(curl -sSo /dev/null -w "%{http_code}" --max-time 20 --head "$url" 2>/dev/null)
+            if [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ] || [ "$code" = "403" ]; then
+              echo "  OK    $label"
+              PASSED=$((PASSED + 1))
+            else
+              echo "  FAIL  $label (HTTP $code)"
+              FAILED+=("$label ($code)")
+            fi
+          }
+
+          echo "=== ISO download URLs ==="
+          check_url "ubuntu-server 24.04" "https://releases.ubuntu.com/24.04/ubuntu-24.04-live-server-amd64.iso"
+          check_url "ubuntu-server 22.04" "https://releases.ubuntu.com/22.04/ubuntu-22.04.4-live-server-amd64.iso"
+          check_url "ubuntu-desktop 24.04" "https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso"
+          check_url "debian-netinst 12" "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.5.0-amd64-netinst.iso"
+          check_url "fedora-server 40" "https://download.fedoraproject.org/pub/fedora/linux/releases/40/Server/x86_64/iso/Fedora-Server-dvd-x86_64-40-1.14.iso"
+          check_url "rocky-linux 9" "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.3-x86_64-dvd.iso"
+          check_url "alpine 3.19" "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-standard-3.19.1-x86_64.iso"
+          check_url "arch-linux 2024.01" "https://mirror.rackspace.com/archlinux/iso/2024.01.01/archlinux-2024.01.01-x86_64.iso"
+          check_url "opensuse-leap 15.5" "https://download.opensuse.org/distribution/leap/15.5/iso/openSUSE-Leap-15.5-DVD-x86_64-Media.iso"
+
+          echo ""
+          echo "=== Netboot kernel/initrd URLs ==="
+          check_url "debian-12 kernel" "https://deb.debian.org/debian/dists/bookworm/main/installer-amd64/current/images/netboot/debian-installer/amd64/linux"
+          check_url "debian-12 initrd" "https://deb.debian.org/debian/dists/bookworm/main/installer-amd64/current/images/netboot/debian-installer/amd64/initrd.gz"
+          check_url "fedora-40 kernel" "https://download.fedoraproject.org/pub/fedora/linux/releases/40/Server/x86_64/os/images/pxeboot/vmlinuz"
+          check_url "fedora-40 initrd" "https://download.fedoraproject.org/pub/fedora/linux/releases/40/Server/x86_64/os/images/pxeboot/initrd.img"
+          check_url "rocky-9 kernel" "https://download.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/images/pxeboot/vmlinuz"
+          check_url "rocky-9 initrd" "https://download.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/images/pxeboot/initrd.img"
+          check_url "alpine-3.19 kernel" "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/netboot/vmlinuz-lts"
+          check_url "alpine-3.19 initrd" "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/netboot/initramfs-lts"
+          check_url "opensuse-15.5 kernel" "https://download.opensuse.org/distribution/leap/15.5/repo/oss/boot/x86_64/loader/linux"
+          check_url "opensuse-15.5 initrd" "https://download.opensuse.org/distribution/leap/15.5/repo/oss/boot/x86_64/loader/initrd"
+
+          echo ""
+          echo "Passed: $PASSED"
+          if [ ${#FAILED[@]} -gt 0 ]; then
+            echo "Failed: ${#FAILED[@]}"
+            printf '  - %s\n' "${FAILED[@]}"
+            echo "failed_urls<<EOF" >> "$GITHUB_OUTPUT"
+            printf '%s\n' "${FAILED[@]}" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          else
+            echo "All URLs reachable."
+            echo "failed_urls=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open issue if URLs are broken
+        if: steps.validate.outputs.failed_urls != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const failed = `${{ steps.validate.outputs.failed_urls }}`;
+            const netbootTag = `${{ steps.netboot.outputs.tag }}`;
+            const body = [
+              '## Catalogue URL check failed',
+              '',
+              'The weekly catalogue check found unreachable URLs. Update `internal/images/catalogue.yaml` with the correct links.',
+              '',
+              '### Failed URLs',
+              ...failed.split('\n').filter(Boolean).map(u => `- ${u}`),
+              '',
+              `### netboot.xyz latest release`,
+              `\`${netbootTag}\` — verify the chain URL in \`internal/bootmenu/menu.go\` is current.`,
+            ].join('\n');
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'catalogue-stale',
+              state: 'open',
+            });
+
+            if (existing.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: 'Stale catalogue URLs detected',
+                body,
+                labels: ['catalogue-stale'],
+              });
+            }
+
+      - name: Close stale issue if all URLs pass
+        if: steps.validate.outputs.failed_urls == ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'catalogue-stale',
+              state: 'open',
+            });
+            for (const issue of existing.data) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+              });
+            }

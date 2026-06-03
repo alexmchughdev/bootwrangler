@@ -493,6 +493,35 @@ func (s *Service) RenderGRUBMenu(title string, entries []bootmenu.Entry) (string
 	return bootmenu.RenderGRUB(m)
 }
 
+// ListNetbootImages returns distro entries that have direct PXE kernel/initrd URLs.
+func (s *Service) ListNetbootImages() []images.NetbootImage {
+	return images.ListNetbootImages(images.BuiltinCatalogue())
+}
+
+// FormatNetbootCmdline returns the installer kernel cmdline for a given OS family,
+// with the config URL inserted in the distro-specific format.
+// serverBaseURL is the base URL of the provisioning server (e.g. "http://192.168.1.1:8080").
+func (s *Service) FormatNetbootCmdline(osFamily, serverBaseURL string) (string, error) {
+	base := strings.TrimRight(serverBaseURL, "/")
+	switch osFamily {
+	case "ubuntu":
+		// Subiquity autoinstall via cloud-init seed — seedfrom takes a directory URL
+		return fmt.Sprintf("autoinstall ds=nocloud-net;seedfrom=%s/", base), nil
+	case "debian":
+		return fmt.Sprintf("auto=true priority=critical url=%s/preseed.cfg", base), nil
+	case "fedora", "rocky", "rhel", "almalinux":
+		return fmt.Sprintf("inst.ks=%s/kickstart.ks", base), nil
+	case "opensuse", "suse":
+		return fmt.Sprintf("autoyast=%s/autoyast.xml", base), nil
+	case "alpine":
+		return fmt.Sprintf("alpine_start=%s/answers", base), nil
+	case "arch":
+		return "", fmt.Errorf("arch linux does not support automated install via preseed/kickstart; use cloud-init post-install")
+	default:
+		return "", fmt.Errorf("no netboot cmdline template for OS family %q", osFamily)
+	}
+}
+
 func validationResult(err error) ValidationResult {
 	if err == nil {
 		return ValidationResult{

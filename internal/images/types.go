@@ -28,12 +28,14 @@ const (
 
 // ArchImage is one architecture-specific image download.
 type ArchImage struct {
-	Type          ImageType     `yaml:"type"`
-	URL           string        `yaml:"url"`
-	ChecksumURL   string        `yaml:"checksum_url,omitempty"`
-	SignatureURL  string        `yaml:"signature_url,omitempty"`
-	Compatibility Compatibility `yaml:"compatibility"`
-	BootMode      []BootMode    `yaml:"boot_mode"`
+	Type             ImageType     `yaml:"type"`
+	URL              string        `yaml:"url"`
+	ChecksumURL      string        `yaml:"checksum_url,omitempty"`
+	SignatureURL     string        `yaml:"signature_url,omitempty"`
+	Compatibility    Compatibility `yaml:"compatibility"`
+	BootMode         []BootMode    `yaml:"boot_mode"`
+	NetbootKernelURL string        `yaml:"netboot_kernel_url,omitempty"`
+	NetbootInitrdURL string        `yaml:"netboot_initrd_url,omitempty"`
 }
 
 // ArchEntry is one architecture for a version.

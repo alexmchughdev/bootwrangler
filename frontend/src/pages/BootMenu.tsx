@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { renderIPXEMenu, renderGRUBMenu, writeTextFile, type EntryKind, type MenuEntry } from "../api/backend";
+import { useState, useEffect } from "react";
+import { renderIPXEMenu, renderGRUBMenu, writeTextFile, listNetbootImages, formatNetbootCmdline, type EntryKind, type MenuEntry, type NetbootImage } from "../api/backend";
 
 type Format = "iPXE" | "GRUB";
 
@@ -44,6 +44,15 @@ export default function BootMenu() {
   const [copied, setCopied] = useState(false);
   const [savePath, setSavePath] = useState("");
   const [saved, setSaved] = useState(false);
+  const [netbootImages, setNetbootImages] = useState<NetbootImage[]>([]);
+  const [autofillIndex, setAutofillIndex] = useState<number | null>(null);
+  const [autofillConfigURL, setAutofillConfigURL] = useState(
+    () => localStorage.getItem("bw_server_base_url") ?? "",
+  );
+
+  useEffect(() => {
+    void listNetbootImages().then(setNetbootImages).catch(() => {});
+  }, []);
 
   function updateEntry(index: number, patch: Partial<MenuEntry>) {
     setEntries((prev) =>
@@ -70,6 +79,16 @@ export default function BootMenu() {
 
   function addEntry() {
     setEntries((prev) => [...prev, emptyEntry()]);
+  }
+
+  async function handleAutofill(entryIndex: number, image: NetbootImage) {
+    const cmdline = await formatNetbootCmdline(image.Family, autofillConfigURL).catch(() => "");
+    updateEntry(entryIndex, {
+      Kernel: image.KernelURL,
+      Initrd: image.InitrdURL,
+      Cmdline: cmdline,
+    });
+    setAutofillIndex(null);
   }
 
   async function handlePreview() {
@@ -202,6 +221,43 @@ export default function BootMenu() {
 
                 {showKernelFields(entry.Kind) && (
                   <div className="boot-menu-kernel-fields">
+                    <div className="boot-menu-autofill-row">
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => setAutofillIndex(autofillIndex === index ? null : index)}
+                      >
+                        {autofillIndex === index ? "Cancel auto-fill" : "Auto-fill from OS"}
+                      </button>
+                    </div>
+                    {autofillIndex === index && (
+                      <div className="boot-menu-autofill-panel">
+                        <div className="boot-menu-field">
+                          <span className="field-label">Config server URL</span>
+                          <input
+                            type="text"
+                            value={autofillConfigURL}
+                            onChange={(e) => setAutofillConfigURL(e.target.value)}
+                            placeholder="http://192.168.1.1:8080"
+                          />
+                        </div>
+                        <div className="boot-menu-autofill-options">
+                          {netbootImages.map((img) => (
+                            <button
+                              key={`${img.ID}-${img.Version}-${img.Arch}`}
+                              type="button"
+                              className="boot-menu-autofill-btn"
+                              onClick={() => void handleAutofill(index, img)}
+                            >
+                              {img.Name} {img.Version} ({img.Arch})
+                            </button>
+                          ))}
+                          {netbootImages.length === 0 && (
+                            <p className="boot-menu-autofill-empty">No direct netboot images available — use netboot.xyz.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div className="boot-menu-field">
                       <span className="field-label">Kernel</span>
                       <input

@@ -174,6 +174,16 @@ export interface MenuEntry {
   Cmdline: string;
 }
 
+export interface NetbootImage {
+  ID: string;
+  Name: string;
+  Family: string;
+  Version: string;
+  Arch: string;
+  KernelURL: string;
+  InitrdURL: string;
+}
+
 export interface CPUInfo {
   Model: string;
   Cores: number;
@@ -249,6 +259,8 @@ interface AppService {
   ReadRenderedFile(path: string): Promise<string>;
   RenderIPXEMenu(title: string, entries: MenuEntry[]): Promise<string>;
   RenderGRUBMenu(title: string, entries: MenuEntry[]): Promise<string>;
+  ListNetbootImages(): Promise<NetbootImage[]>;
+  FormatNetbootCmdline(osFamily: string, serverBaseURL: string): Promise<string>;
 }
 
 declare global {
@@ -536,6 +548,16 @@ export async function renderIPXEMenu(title: string, entries: MenuEntry[]): Promi
 
 export async function renderGRUBMenu(title: string, entries: MenuEntry[]): Promise<string> {
   return requireService().RenderGRUBMenu(title, entries);
+}
+
+export async function listNetbootImages(): Promise<NetbootImage[]> {
+  const service = getService();
+  if (!service) return [];
+  return service.ListNetbootImages();
+}
+
+export async function formatNetbootCmdline(osFamily: string, serverBaseURL: string): Promise<string> {
+  return requireService().FormatNetbootCmdline(osFamily, serverBaseURL);
 }
 
 function getService(): AppService | undefined {

@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import type { Profile } from "../types/profile";
 import {
+  formatNetbootCmdline,
   libraryGet,
   libraryList,
+  listNetbootImages,
   loadProfile,
   readRenderedFile,
   renderProfile,
   validateProfile,
+  type NetbootImage,
   type RenderManifest,
 } from "../api/backend";
 
@@ -30,9 +33,13 @@ export default function RenderPreview({ onNavigate }: Props) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [libraryNames, setLibraryNames] = useState<string[]>([]);
   const [selectedLibName, setSelectedLibName] = useState("");
+  const [netbootImages, setNetbootImages] = useState<NetbootImage[]>([]);
+  const [netbootCmdline, setNetbootCmdline] = useState<string | null>(null);
+  const [netbootCopied, setNetbootCopied] = useState(false);
 
   useEffect(() => {
     void libraryList().then((entries) => setLibraryNames(entries.map((e) => e.name))).catch(() => {});
+    void listNetbootImages().then(setNetbootImages).catch(() => {});
   }, []);
 
   async function handleRenderFromLibrary() {
@@ -94,6 +101,13 @@ export default function RenderPreview({ onNavigate }: Props) {
       localStorage.setItem(LS_LAST_RENDER_DIR, effectiveOutDir);
       setManifest(result);
       setState("done");
+      if (serverBaseURL) {
+        void formatNetbootCmdline(result.os_family, serverBaseURL)
+          .then(setNetbootCmdline)
+          .catch(() => setNetbootCmdline(null));
+      } else {
+        setNetbootCmdline(null);
+      }
     } catch (err) {
       setErrorMsg(`Render failed: ${String(err)}`);
       setState("error");
@@ -258,6 +272,49 @@ export default function RenderPreview({ onNavigate }: Props) {
               </tbody>
             </table>
           </div>
+
+          {(() => {
+            const directImage = netbootImages.find(
+              (img) => img.Family === manifest.os_family && img.Version === manifest.os_version,
+            ) ?? netbootImages.find((img) => img.Family === manifest.os_family);
+            const serverBaseURL = localStorage.getItem("bw_server_base_url") ?? "";
+            const chainNote = !directImage
+              ? `# ${manifest.os_family} has no standalone netboot image; chain via netboot.xyz\nchain https://boot.netboot.xyz\n\n# Then add this to the installer's 'Additional boot options':\n# ${netbootCmdline ?? "<configure provisioning server URL in Settings>"}`
+              : `#!ipxe\nkernel ${directImage.KernelURL}${netbootCmdline ? ` ${netbootCmdline}` : ""}\ninitrd ${directImage.InitrdURL}\nboot`;
+
+            return (
+              <div className="render-netboot-panel">
+                <span className="panel-label">Netboot Entry</span>
+                <p className="render-hint">
+                  Paste this iPXE snippet into your PXE server or Boot Menu page. The installer
+                  will fetch its config from your provisioning server automatically.
+                  {!serverBaseURL && (
+                    <> Set the <strong>server base URL</strong> in Settings to fill in the config URL.</>
+                  )}
+                </p>
+                <pre className="render-netboot-snippet">{chainNote}</pre>
+                <div className="render-netboot-actions">
+                  <button
+                    type="button"
+                    className="secondary-action"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(chainNote).then(() => {
+                        setNetbootCopied(true);
+                        setTimeout(() => setNetbootCopied(false), 2000);
+                      });
+                    }}
+                  >
+                    {netbootCopied ? "Copied!" : "Copy"}
+                  </button>
+                  {directImage && (
+                    <span className="render-netboot-source">
+                      Kernel/initrd: {directImage.Name} {directImage.Version} ({directImage.Arch})
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {onNavigate && (
             <div className="render-result-actions">
