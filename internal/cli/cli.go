@@ -3,10 +3,13 @@ package cli
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/alexmchughdev/bootwrangler/internal/editor"
 	"github.com/alexmchughdev/bootwrangler/internal/images"
 	"github.com/alexmchughdev/bootwrangler/internal/library"
+	"github.com/alexmchughdev/bootwrangler/internal/media"
+	"github.com/alexmchughdev/bootwrangler/internal/policy"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
 	"github.com/alexmchughdev/bootwrangler/internal/render"
 	"github.com/alexmchughdev/bootwrangler/internal/usb"
@@ -21,8 +24,11 @@ Usage:
 Commands:
   flash       Flash a whole-drive image onto a USB device
   images      Browse and manage OS image catalogue
+  lab         Start and manage QEMU lab VMs
   library     Manage the local profile library
+  policy      Check a profile against a policy file
   profile     Manage provisioning profiles
+  recipe      Validate and plan multi-partition media recipes
   render      Render a profile into unattended installer assets
   usb         Discover and inspect USB and block devices
   version     Print the BootWrangler version
@@ -43,10 +49,16 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runFlash(args[1:], stdout, stderr)
 	case "images":
 		return runImages(args[1:], stdout, stderr)
+	case "lab":
+		return runLab(args[1:], stdout, stderr)
 	case "library":
 		return runLibrary(args[1:], stdout, stderr)
+	case "policy":
+		return runPolicy(args[1:], stdout, stderr)
 	case "profile":
 		return runProfile(args[1:], stdout, stderr)
+	case "recipe":
+		return runRecipe(args[1:], stdout, stderr)
 	case "render":
 		return runRender(args[1:], stdout, stderr)
 	case "usb":
@@ -423,6 +435,10 @@ func runUSB(args []string, stdout, stderr io.Writer) int {
 }
 
 func runFlash(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "partition" {
+		return runFlashPartition(args[1:], stdout, stderr)
+	}
+
 	var imagePath string
 	var devicePath string
 	var dryRun bool
@@ -460,6 +476,7 @@ func runFlash(args []string, stdout, stderr io.Writer) int {
 
 	if imagePath == "" || devicePath == "" {
 		fmt.Fprintln(stderr, "usage: bootwrangler flash <image-path> --device /dev/sdX [--dry-run | --confirm /dev/sdX]")
+		fmt.Fprintln(stderr, "       bootwrangler flash partition <image-path> --device /dev/sdX --partition /dev/sdX1 [--dry-run | --confirm /dev/sdX1]")
 		return 2
 	}
 
@@ -510,6 +527,277 @@ func runFlash(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintln(stdout, "Flash complete.")
 	return 0
+}
+
+func runFlashPartition(args []string, stdout, stderr io.Writer) int {
+	var imagePath string
+	var devicePath string
+	var partitionPath string
+	var dryRun bool
+	var confirm string
+
+	i := 0
+	for i < len(args) {
+		switch args[i] {
+		case "--device":
+			if i+1 >= len(args) {
+				fmt.Fprintln(stderr, "flash partition: --device requires a path argument")
+				return 2
+			}
+			devicePath = args[i+1]
+			i += 2
+		case "--partition":
+			if i+1 >= len(args) {
+				fmt.Fprintln(stderr, "flash partition: --partition requires a path argument")
+				return 2
+			}
+			partitionPath = args[i+1]
+			i += 2
+		case "--dry-run":
+			dryRun = true
+			i++
+		case "--confirm":
+			if i+1 >= len(args) {
+				fmt.Fprintln(stderr, "flash partition: --confirm requires a partition path argument")
+				return 2
+			}
+			confirm = args[i+1]
+			i += 2
+		default:
+			if imagePath != "" {
+				fmt.Fprintln(stderr, "flash partition: unexpected argument:", args[i])
+				return 2
+			}
+			imagePath = args[i]
+			i++
+		}
+	}
+
+	if imagePath == "" || devicePath == "" || partitionPath == "" {
+		fmt.Fprintln(stderr, "usage: bootwrangler flash partition <image> --device /dev/sdX --partition /dev/sdX1 [--dry-run | --confirm /dev/sdX1]")
+		return 2
+	}
+
+	devices, err := usb.ListDevices()
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	var targetDev *usb.Device
+	var targetPart *usb.Partition
+	for i := range devices {
+		if devices[i].Path != devicePath {
+			continue
+		}
+		targetDev = &devices[i]
+		for j := range devices[i].Partitions {
+			if devices[i].Partitions[j].Path == partitionPath {
+				targetPart = &devices[i].Partitions[j]
+				break
+			}
+		}
+		break
+	}
+
+	if targetDev == nil {
+		fmt.Fprintf(stderr, "device not found: %s\n", devicePath)
+		return 1
+	}
+	if targetPart == nil {
+		fmt.Fprintf(stderr, "partition not found: %s\n", partitionPath)
+		return 1
+	}
+
+	plan, err := usb.PlanPartitionFlash(*targetDev, *targetPart, imagePath, dryRun)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "Flash plan (partition):\n")
+	fmt.Fprintf(stdout, "  image:     %s (%s)\n", plan.ImagePath, plan.ImageSizeHuman)
+	fmt.Fprintf(stdout, "  partition: %s (%s)\n", plan.DevicePath, plan.DeviceSizeHuman)
+	fmt.Fprintf(stdout, "  command:   %s\n", plan.Command)
+
+	if dryRun {
+		fmt.Fprintln(stdout, "Dry run — no changes written.")
+		return 0
+	}
+
+	if confirm != partitionPath {
+		fmt.Fprintln(stderr, "WARNING: This will permanently overwrite all data on the partition.")
+		fmt.Fprintln(stderr, "Add --dry-run to preview or --confirm <partition> to execute.")
+		return 2
+	}
+
+	fmt.Fprintf(stdout, "Flashing %s to %s...\n", plan.ImagePath, plan.DevicePath)
+	if err := usb.ExecuteFlash(plan); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	fmt.Fprintln(stdout, "Flash complete.")
+	return 0
+}
+
+func runRecipe(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage:")
+		fmt.Fprintln(stderr, "  bootwrangler recipe validate <recipe.yaml>")
+		fmt.Fprintln(stderr, "  bootwrangler recipe plan <recipe.yaml> --device /dev/sdX")
+		return 2
+	}
+
+	switch args[0] {
+	case "validate":
+		if len(args) != 2 {
+			fmt.Fprintln(stderr, "usage: bootwrangler recipe validate <recipe.yaml>")
+			return 2
+		}
+		r, err := media.LoadRecipe(args[1])
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "recipe valid: %s (%d partitions)\n", r.Name, len(r.Partitions))
+		return 0
+
+	case "plan":
+		if len(args) < 2 {
+			fmt.Fprintln(stderr, "usage: bootwrangler recipe plan <recipe.yaml> --device /dev/sdX")
+			return 2
+		}
+		recipePath := args[1]
+		var devicePath string
+		for i := 2; i < len(args)-1; i++ {
+			if args[i] == "--device" {
+				devicePath = args[i+1]
+			}
+		}
+		if devicePath == "" {
+			fmt.Fprintln(stderr, "recipe plan: --device is required")
+			return 2
+		}
+
+		data, err := os.ReadFile(recipePath)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		r, err := media.LoadRecipeFromBytes(data)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		devices, err := usb.ListDevices()
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		var deviceSize int64
+		for _, d := range devices {
+			if d.Path == devicePath {
+				deviceSize = d.Size
+				break
+			}
+		}
+		if deviceSize == 0 {
+			fmt.Fprintf(stderr, "device not found: %s\n", devicePath)
+			return 1
+		}
+
+		plan, err := media.PlanBuild(r, devicePath, deviceSize, false)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprint(stdout, media.FormatBuildPlan(plan))
+		return 0
+
+	default:
+		fmt.Fprintf(stderr, "unknown recipe command %q\n", args[0])
+		return 2
+	}
+}
+
+func runPolicy(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage:")
+		fmt.Fprintln(stderr, "  bootwrangler policy check <profile.yaml> [--policy <policy.yaml>]")
+		return 2
+	}
+
+	switch args[0] {
+	case "check":
+		profilePath := ""
+		policyPath := ""
+		for i := 1; i < len(args); i++ {
+			switch args[i] {
+			case "--policy":
+				if i+1 >= len(args) {
+					fmt.Fprintln(stderr, "policy check: --policy requires a file argument")
+					return 2
+				}
+				policyPath = args[i+1]
+				i++
+			default:
+				if profilePath != "" {
+					fmt.Fprintln(stderr, "policy check: unexpected argument:", args[i])
+					return 2
+				}
+				profilePath = args[i]
+			}
+		}
+		if profilePath == "" {
+			fmt.Fprintln(stderr, "usage: bootwrangler policy check <profile.yaml> [--policy <policy.yaml>]")
+			return 2
+		}
+
+		p, err := profile.LoadAndValidateFile(profilePath)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+
+		var pol policy.Policy
+		if policyPath != "" {
+			pol, err = policy.LoadPolicy(policyPath)
+			if err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+		}
+
+		userNames := make([]string, len(p.Users))
+		for i, u := range p.Users {
+			userNames[i] = u.Name
+		}
+		snap := policy.ProfileSnapshot{
+			OSFamily:               p.OS.Family,
+			SSHPasswordAuth:        p.SSH.PasswordAuthentication,
+			SSHPermitRootLogin:     p.SSH.PermitRootLogin,
+			DiskConfirmDestructive: p.Disk.ConfirmDestructive,
+			Users:                  userNames,
+			Packages:               p.Packages.Names,
+			PackagePresets:         p.Packages.Presets,
+		}
+
+		result := policy.Check(pol, snap)
+		if result.Passed {
+			fmt.Fprintln(stdout, "policy check passed")
+			return 0
+		}
+		fmt.Fprintf(stdout, "policy check failed (%d violation(s)):\n", len(result.Violations))
+		for _, v := range result.Violations {
+			fmt.Fprintf(stdout, "  [%s] %s\n", v.Rule, v.Message)
+		}
+		return 1
+
+	default:
+		fmt.Fprintf(stderr, "unknown policy command %q\n", args[0])
+		return 2
+	}
 }
 
 func printProfileUsage(writer io.Writer) {

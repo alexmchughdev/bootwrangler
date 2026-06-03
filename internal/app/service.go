@@ -12,6 +12,8 @@ import (
 	"github.com/alexmchughdev/bootwrangler/internal/images"
 	"github.com/alexmchughdev/bootwrangler/internal/library"
 	"github.com/alexmchughdev/bootwrangler/internal/manifest"
+	"github.com/alexmchughdev/bootwrangler/internal/media"
+	"github.com/alexmchughdev/bootwrangler/internal/policy"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
 	"github.com/alexmchughdev/bootwrangler/internal/render"
 	"github.com/alexmchughdev/bootwrangler/internal/secrets"
@@ -253,6 +255,26 @@ func (s *Service) PlanFlash(devicePath, imagePath string) (usb.FlashPlan, error)
 	return usb.FlashPlan{}, fmt.Errorf("device not found: %s", devicePath)
 }
 
+// PlanPartitionFlash validates flashing an image to a specific partition.
+func (s *Service) PlanPartitionFlash(devicePath, partitionPath, imagePath string) (usb.FlashPlan, error) {
+	devices, err := usb.ListDevices()
+	if err != nil {
+		return usb.FlashPlan{}, fmt.Errorf("list devices: %w", err)
+	}
+	for _, dev := range devices {
+		if dev.Path != devicePath {
+			continue
+		}
+		for _, part := range dev.Partitions {
+			if part.Path == partitionPath {
+				return usb.PlanPartitionFlash(dev, part, imagePath, false)
+			}
+		}
+		return usb.FlashPlan{}, fmt.Errorf("partition not found: %s", partitionPath)
+	}
+	return usb.FlashPlan{}, fmt.Errorf("device not found: %s", devicePath)
+}
+
 // ExecuteFlash runs a previously validated flash plan.
 // Returns error if device is no longer safe at execution time.
 func (s *Service) ExecuteFlash(plan usb.FlashPlan) error {
@@ -269,6 +291,46 @@ func (s *Service) ExecuteFlash(plan usb.FlashPlan) error {
 		}
 	}
 	return fmt.Errorf("device not found: %s", plan.DevicePath)
+}
+
+// PlanMediaBuild parses the recipe YAML, looks up the device size, and returns a BuildPlan.
+func (s *Service) PlanMediaBuild(recipeYAML string, devicePath string) (media.BuildPlan, error) {
+	r, err := media.LoadRecipeFromBytes([]byte(recipeYAML))
+	if err != nil {
+		return media.BuildPlan{}, err
+	}
+
+	devices, err := usb.ListDevices()
+	if err != nil {
+		return media.BuildPlan{}, fmt.Errorf("list devices: %w", err)
+	}
+
+	var deviceSize int64
+	for _, d := range devices {
+		if d.Path == devicePath {
+			deviceSize = d.Size
+			break
+		}
+	}
+	if deviceSize == 0 {
+		return media.BuildPlan{}, fmt.Errorf("device not found: %s", devicePath)
+	}
+
+	return media.PlanBuild(r, devicePath, deviceSize, false)
+}
+
+// FormatMediaBuildPlan returns a human-readable summary of a BuildPlan.
+func (s *Service) FormatMediaBuildPlan(plan media.BuildPlan) string {
+	return media.FormatBuildPlan(plan)
+}
+
+// CheckPolicy validates a profile against a YAML policy string.
+func (s *Service) CheckPolicy(policyYAML string, snap policy.ProfileSnapshot) (policy.CheckResult, error) {
+	p, err := policy.LoadPolicyFromBytes([]byte(policyYAML))
+	if err != nil {
+		return policy.CheckResult{}, err
+	}
+	return policy.Check(p, snap), nil
 }
 
 func validationResult(err error) ValidationResult {
