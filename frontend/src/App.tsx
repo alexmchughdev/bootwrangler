@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { getHealth, type HealthStatus } from "./api/backend";
 import { navigationItems } from "./navigation";
+import FlashImage from "./pages/FlashImage";
+import FlashPartition from "./pages/FlashPartition";
 import Images from "./pages/Images";
+import Lab from "./pages/Lab";
+import MediaBuilder from "./pages/MediaBuilder";
 import ProfileEditor from "./pages/ProfileEditor";
 import ProfileLibrary from "./pages/ProfileLibrary";
 import ProvisioningServer from "./pages/ProvisioningServer";
 import RenderPreview from "./pages/RenderPreview";
+import USBDevices from "./pages/USBDevices";
 
 const initialHealth: HealthStatus = {
   status: "connecting",
@@ -31,7 +36,7 @@ function App() {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">BF</span>
+          <span className="brand-mark">BW</span>
           <div>
             <strong>BootWrangler</strong>
             <span>Provisioning Studio</span>
@@ -87,6 +92,16 @@ function App() {
           <ProvisioningServer />
         ) : activeSection === "Images" ? (
           <Images />
+        ) : activeSection === "Flash Image" ? (
+          <FlashImage />
+        ) : activeSection === "Flash Partition" ? (
+          <FlashPartition />
+        ) : activeSection === "USB Devices" ? (
+          <USBDevices />
+        ) : activeSection === "Media Builder" ? (
+          <MediaBuilder />
+        ) : activeSection === "Lab" ? (
+          <Lab />
         ) : (
           <Dashboard />
         )}

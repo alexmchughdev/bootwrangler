@@ -81,6 +81,17 @@ export interface UsbDevice {
   SafetyNote: string;
 }
 
+export interface FlashPlan {
+  ImagePath: string;
+  DevicePath: string;
+  ImageSize: number;
+  ImageSizeHuman: string;
+  DeviceSize: number;
+  DeviceSizeHuman: string;
+  Command: string;
+  DryRun: boolean;
+}
+
 interface AppService {
   AvailableRenderers(): Promise<string[]>;
   Health(): Promise<HealthStatus>;
@@ -91,6 +102,8 @@ interface AppService {
   GetDevice(path: string): Promise<UsbDevice>;
   LoadProfile(path: string): Promise<Profile>;
   OpenInNeovim(path: string, readOnly: boolean): Promise<void>;
+  PlanFlash(devicePath: string, imagePath: string): Promise<FlashPlan>;
+  ExecuteFlash(plan: FlashPlan): Promise<void>;
   RenderProfile(value: Profile, outDir: string): Promise<RenderManifest>;
   SaveProfile(path: string, value: Profile): Promise<void>;
   ValidateProfile(value: Profile): Promise<ValidationResult>;
@@ -193,6 +206,17 @@ export async function listDevices(): Promise<UsbDevice[]> {
 
 export async function getDevice(path: string): Promise<UsbDevice> {
   return requireService().GetDevice(path);
+}
+
+export async function planFlash(
+  devicePath: string,
+  imagePath: string,
+): Promise<FlashPlan> {
+  return requireService().PlanFlash(devicePath, imagePath);
+}
+
+export async function executeFlash(plan: FlashPlan): Promise<void> {
+  return requireService().ExecuteFlash(plan);
 }
 
 function getService(): AppService | undefined {

@@ -4,6 +4,8 @@ export const navigationItems = [
   "Library",
   "Render",
   "Images",
+  "Flash Image",
+  "Flash Partition",
   "Media Builder",
   "Lab",
   "USB Devices",
