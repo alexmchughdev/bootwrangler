@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getHealth, type HealthStatus } from "./api/backend";
 import { navigationItems } from "./navigation";
+import Images from "./pages/Images";
 import ProfileEditor from "./pages/ProfileEditor";
 import ProfileLibrary from "./pages/ProfileLibrary";
 import ProvisioningServer from "./pages/ProvisioningServer";
@@ -84,6 +85,8 @@ function App() {
           <RenderPreview />
         ) : activeSection === "Provisioning Server" ? (
           <ProvisioningServer />
+        ) : activeSection === "Images" ? (
+          <Images />
         ) : (
           <Dashboard />
         )}

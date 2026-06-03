@@ -25,9 +25,43 @@ export interface RenderManifest {
   warnings: string[];
 }
 
+export interface ArchImage {
+  Type: string;
+  URL: string;
+  ChecksumURL: string;
+  Compatibility: { WholeDrive: boolean; Partition: boolean; ISOFileBoot: boolean };
+  BootMode: string[];
+}
+
+export interface ArchEntry {
+  Arch: string;
+  Images: ArchImage[];
+}
+
+export interface VersionEntry {
+  Version: string;
+  Architectures: ArchEntry[];
+}
+
+export interface CatalogueEntry {
+  ID: string;
+  Name: string;
+  Family: string;
+  Versions: VersionEntry[];
+}
+
+export interface CacheStatus {
+  Cached: boolean;
+  Path: string;
+  Verified: boolean;
+}
+
 interface AppService {
   AvailableRenderers(): Promise<string[]>;
   Health(): Promise<HealthStatus>;
+  ListImages(): Promise<CatalogueEntry[]>;
+  GetImage(id: string): Promise<CatalogueEntry>;
+  ImageCacheStatus(id: string, version: string, arch: string): Promise<CacheStatus>;
   LoadProfile(path: string): Promise<Profile>;
   OpenInNeovim(path: string, readOnly: boolean): Promise<void>;
   RenderProfile(value: Profile, outDir: string): Promise<RenderManifest>;
@@ -104,6 +138,24 @@ export async function renderProfile(
   outDir: string,
 ): Promise<RenderManifest> {
   return requireService().RenderProfile(value, outDir);
+}
+
+export async function listImages(): Promise<CatalogueEntry[]> {
+  const service = getService();
+  if (!service) return [];
+  return service.ListImages();
+}
+
+export async function getImage(id: string): Promise<CatalogueEntry> {
+  return requireService().GetImage(id);
+}
+
+export async function imageCacheStatus(
+  id: string,
+  version: string,
+  arch: string,
+): Promise<CacheStatus> {
+  return requireService().ImageCacheStatus(id, version, arch);
 }
 
 function getService(): AppService | undefined {
