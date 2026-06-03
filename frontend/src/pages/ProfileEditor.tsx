@@ -1,10 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  expandPackagePresets,
+  listPackagePresets,
+  listRolePresets,
   loadProfile,
   openInNeovim,
   saveProfile,
   validateProfile,
   validateSSHPublicKey,
+  type PackagePreset,
+  type RolePreset,
   type ValidationResult,
 } from "../api/backend";
 import {
@@ -20,11 +25,11 @@ const pendingValidation: ValidationResult = {
   problems: ["Waiting for backend validation."],
 };
 
-function ProfileEditor() {
-  const [profile, setProfile] = useState(createDefaultProfile);
+function ProfileEditor({ initialProfile }: { initialProfile?: Profile }) {
+  const [profile, setProfile] = useState(() => initialProfile ? normalizeProfile(initialProfile) : createDefaultProfile());
   const [path, setPath] = useState("");
   const [validation, setValidation] = useState(pendingValidation);
-  const [message, setMessage] = useState("Create a profile or load an existing YAML file.");
+  const [message, setMessage] = useState(initialProfile ? "Profile loaded from import." : "Create a profile or load an existing YAML file.");
 
   useEffect(() => {
     let active = true;
@@ -286,37 +291,126 @@ function ProfileEditor() {
           />
         </EditorSection>
 
-        <EditorSection title="Packages and Services">
-          <Field label="Package presets">
-            <input
-              value={joinList(profile.packages.presets)}
-              onChange={(event) =>
-                setProfile({ ...profile, packages: { ...profile.packages, presets: splitList(event.target.value) } })
-              }
-            />
-          </Field>
-          <Field label="Explicit packages">
-            <input
-              value={joinList(profile.packages.names)}
-              onChange={(event) =>
-                setProfile({ ...profile, packages: { ...profile.packages, names: splitList(event.target.value) } })
-              }
-            />
-          </Field>
-          <Field label="Enabled services">
-            <input
-              value={joinList(profile.services.enable)}
-              onChange={(event) =>
-                setProfile({ ...profile, services: { enable: splitList(event.target.value) } })
-              }
-            />
-          </Field>
-        </EditorSection>
+        <PackagesSection profile={profile} setProfile={setProfile} />
       </div>
 
       <UsersEditor profile={profile} setProfile={setProfile} />
       <ScriptsEditor path={path} profile={profile} setMessage={setMessage} setProfile={setProfile} />
     </div>
+  );
+}
+
+function PackagesSection({ profile, setProfile }: ProfileEditorProps) {
+  const [browseOpen, setBrowseOpen] = useState(false);
+  const [packagePresets, setPackagePresets] = useState<PackagePreset[]>([]);
+  const [presetsLoaded, setPresetsLoaded] = useState(false);
+  const [rolePresets, setRolePresets] = useState<RolePreset[]>([]);
+
+  useEffect(() => {
+    void listRolePresets().then(setRolePresets);
+  }, []);
+
+  function handleToggleBrowse() {
+    const next = !browseOpen;
+    setBrowseOpen(next);
+    if (next && !presetsLoaded) {
+      void listPackagePresets().then((presets) => {
+        setPackagePresets(presets);
+        setPresetsLoaded(true);
+      });
+    }
+  }
+
+  async function handleChipClick(preset: PackagePreset) {
+    const currentPresets = profile.packages.presets;
+    if (currentPresets.includes(preset.Name)) return;
+    const newPresets = [...currentPresets, preset.Name];
+    const expanded = await expandPackagePresets([preset.Name], profile.os.family);
+    const existingNames = profile.packages.names;
+    const newNames = [...existingNames, ...expanded.filter((p) => !existingNames.includes(p))];
+    setProfile({ ...profile, packages: { presets: newPresets, names: newNames } });
+  }
+
+  async function handleRoleSelect(event: React.ChangeEvent<HTMLSelectElement>) {
+    const roleName = event.target.value;
+    event.target.value = "";
+    if (!roleName) return;
+    const role = rolePresets.find((r) => r.Name === roleName);
+    if (!role) return;
+    const expanded = await expandPackagePresets(role.Packages, profile.os.family);
+    const existingNames = profile.packages.names;
+    const newNames = [...existingNames, ...expanded.filter((p) => !existingNames.includes(p))];
+    setProfile({ ...profile, packages: { ...profile.packages, names: newNames } });
+  }
+
+  const appliedPresets = profile.packages.presets;
+
+  return (
+    <section className="panel form-section">
+      <span className="panel-label">Packages and Services</span>
+      <div className="field-grid">
+        {rolePresets.length > 0 && (
+          <Field label="Role preset">
+            <select defaultValue="" onChange={handleRoleSelect}>
+              <option value="">— select a role —</option>
+              {rolePresets.map((role) => (
+                <option key={role.Name} value={role.Name} title={role.Description}>
+                  {role.Name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <Field label="Package presets">
+          <input
+            value={joinList(profile.packages.presets)}
+            onChange={(event) =>
+              setProfile({ ...profile, packages: { ...profile.packages, presets: splitList(event.target.value) } })
+            }
+          />
+          <button className="preset-browse-toggle" onClick={handleToggleBrowse} type="button">
+            {browseOpen ? "▲ Browse presets" : "▼ Browse presets"}
+          </button>
+          {browseOpen && (
+            <div className="preset-chip-grid">
+              {!presetsLoaded && <span className="preset-loading">Loading…</span>}
+              {packagePresets.map((preset) => {
+                const applied = appliedPresets.includes(preset.Name);
+                return (
+                  <button
+                    className={`preset-chip${applied ? " preset-chip--applied" : ""}`}
+                    disabled={applied}
+                    key={preset.Name}
+                    onClick={() => void handleChipClick(preset)}
+                    title={preset.Description}
+                    type="button"
+                  >
+                    {preset.Name}
+                    {applied && <span className="preset-chip-badge">applied</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </Field>
+        <Field label="Explicit packages">
+          <input
+            value={joinList(profile.packages.names)}
+            onChange={(event) =>
+              setProfile({ ...profile, packages: { ...profile.packages, names: splitList(event.target.value) } })
+            }
+          />
+        </Field>
+        <Field label="Enabled services">
+          <input
+            value={joinList(profile.services.enable)}
+            onChange={(event) =>
+              setProfile({ ...profile, services: { enable: splitList(event.target.value) } })
+            }
+          />
+        </Field>
+      </div>
+    </section>
   );
 }
 
