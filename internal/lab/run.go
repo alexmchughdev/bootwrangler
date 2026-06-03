@@ -45,11 +45,12 @@ type Run struct {
 // StartOptions configures a new lab VM run.
 type StartOptions struct {
 	ProfileName string
-	DiskSizeGB  int // default 20
-	MemoryMB    int // default 2048
-	CPUs        int // default 2
-	SSHPort     int // 0 = auto-assign in range 12200-12299
-	VNCPort     int // 0 = auto-assign in range 15900-15999
+	LabDir      string // default ~/.bootwrangler/lab
+	DiskSizeGB  int    // default 20
+	MemoryMB    int    // default 2048
+	CPUs        int    // default 2
+	SSHPort     int    // 0 = auto-assign in range 12200-12299
+	VNCPort     int    // 0 = auto-assign in range 15900-15999
 }
 
 // DefaultLabDir returns the root lab directory under the user home.
@@ -81,7 +82,11 @@ func NewRun(opts StartOptions) (*Run, error) {
 	}
 
 	id := uuid.New().String()
-	wd := WorkDir(id)
+	labDir := opts.LabDir
+	if labDir == "" {
+		labDir = DefaultLabDir()
+	}
+	wd := filepath.Join(labDir, "runs", id)
 	if err := os.MkdirAll(wd, 0o755); err != nil {
 		return nil, fmt.Errorf("create run workspace: %w", err)
 	}

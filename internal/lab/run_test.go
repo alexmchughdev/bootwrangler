@@ -10,9 +10,12 @@ func TestNewRun(t *testing.T) {
 
 	opts := StartOptions{
 		ProfileName: "test-profile",
+		LabDir:      t.TempDir(),
 		DiskSizeGB:  10,
 		MemoryMB:    1024,
 		CPUs:        1,
+		SSHPort:     12255,
+		VNCPort:     15902,
 	}
 	run, err := NewRun(opts)
 	if err != nil {
@@ -44,6 +47,7 @@ func TestPlanQEMU(t *testing.T) {
 
 	opts := StartOptions{
 		ProfileName: "myprofile",
+		LabDir:      t.TempDir(),
 		MemoryMB:    4096,
 		CPUs:        4,
 		SSHPort:     12250,

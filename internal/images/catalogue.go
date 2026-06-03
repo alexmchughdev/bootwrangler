@@ -89,7 +89,6 @@ func FindImage(cat Catalogue, id, version, arch string) (CatalogueEntry, Version
 		fmt.Errorf("image not found: id=%s version=%s arch=%s", id, version, arch)
 }
 
-
 // BuiltinCatalogue returns the built-in catalogue of official OS images.
 // Data is sourced from the embedded catalogue.yaml, which is updated by the
 // update-catalogue GitHub Action to keep URLs current.

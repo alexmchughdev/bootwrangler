@@ -1,10 +1,14 @@
 package inspect
 
 import (
+	"runtime"
+	"strings"
 	"testing"
 )
 
 func TestGatherHostInfo_NoError(t *testing.T) {
+	skipUnsupportedHostInspection(t)
+
 	info, err := GatherHostInfo()
 	if err != nil {
 		t.Fatalf("GatherHostInfo() unexpected error: %v", err)
@@ -25,6 +29,8 @@ func TestHostname(t *testing.T) {
 }
 
 func TestMemoryInfo(t *testing.T) {
+	skipUnsupportedHostInspection(t)
+
 	m, err := MemoryInfo_()
 	if err != nil {
 		t.Fatalf("MemoryInfo_() error = %v", err)
@@ -38,6 +44,8 @@ func TestMemoryInfo(t *testing.T) {
 }
 
 func TestCPUInfo(t *testing.T) {
+	skipUnsupportedHostInspection(t)
+
 	c, err := CPUInfo_()
 	if err != nil {
 		t.Fatalf("CPUInfo_() error = %v", err)
@@ -50,6 +58,61 @@ func TestCPUInfo(t *testing.T) {
 	}
 }
 
+func TestMemoryInfoFromReader(t *testing.T) {
+	m, err := memoryInfoFromReader(strings.NewReader("MemTotal:        2048 kB\n"), "test meminfo")
+	if err != nil {
+		t.Fatalf("memoryInfoFromReader() error = %v", err)
+	}
+	if m.TotalBytes != 2*1024*1024 {
+		t.Errorf("memoryInfoFromReader() TotalBytes = %d, want %d", m.TotalBytes, 2*1024*1024)
+	}
+	if m.TotalHuman != "2.0 MB" {
+		t.Errorf("memoryInfoFromReader() TotalHuman = %q, want %q", m.TotalHuman, "2.0 MB")
+	}
+}
+
+func TestMemoryInfoFromHostinfo(t *testing.T) {
+	m, err := memoryInfoFromHostinfo("Primary memory available: 16.00 gigabytes\n")
+	if err != nil {
+		t.Fatalf("memoryInfoFromHostinfo() error = %v", err)
+	}
+	if m.TotalBytes != 16*1024*1024*1024 {
+		t.Errorf("memoryInfoFromHostinfo() TotalBytes = %d, want %d", m.TotalBytes, 16*1024*1024*1024)
+	}
+	if m.TotalHuman != "16.0 GB" {
+		t.Errorf("memoryInfoFromHostinfo() TotalHuman = %q, want %q", m.TotalHuman, "16.0 GB")
+	}
+}
+
+func TestCPUInfoFromReader(t *testing.T) {
+	data := strings.Join([]string{
+		"processor\t: 0",
+		"model name\t: Test CPU",
+		"physical id\t: 0",
+		"core id\t\t: 0",
+		"",
+		"processor\t: 1",
+		"model name\t: Test CPU",
+		"physical id\t: 0",
+		"core id\t\t: 1",
+		"",
+	}, "\n")
+
+	c, err := cpuInfoFromReader(strings.NewReader(data), "test cpuinfo")
+	if err != nil {
+		t.Fatalf("cpuInfoFromReader() error = %v", err)
+	}
+	if c.Model != "Test CPU" {
+		t.Errorf("cpuInfoFromReader() Model = %q, want %q", c.Model, "Test CPU")
+	}
+	if c.Threads != 2 {
+		t.Errorf("cpuInfoFromReader() Threads = %d, want 2", c.Threads)
+	}
+	if c.Cores != 2 {
+		t.Errorf("cpuInfoFromReader() Cores = %d, want 2", c.Cores)
+	}
+}
+
 func TestNetworkInterfaces(t *testing.T) {
 	ifaces, err := NetworkInterfaces()
 	if err != nil {
@@ -57,6 +120,15 @@ func TestNetworkInterfaces(t *testing.T) {
 	}
 	if len(ifaces) == 0 {
 		t.Error("NetworkInterfaces() returned no interfaces")
+	}
+}
+
+func skipUnsupportedHostInspection(t *testing.T) {
+	t.Helper()
+	switch runtime.GOOS {
+	case "darwin", "linux":
+	default:
+		t.Skipf("host inspection is not implemented on %s", runtime.GOOS)
 	}
 }
 

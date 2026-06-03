@@ -1,12 +1,15 @@
-// Package inspect provides lightweight host inspection by reading system
-// information directly from /proc and the standard library where possible.
+// Package inspect provides lightweight host inspection using platform-native
+// system information sources and the standard library where possible.
 package inspect
 
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -90,15 +93,31 @@ func Hostname() (string, error) {
 	return os.Hostname()
 }
 
-// MemoryInfo_ reads /proc/meminfo and returns total physical memory.
+// MemoryInfo_ returns total physical memory using the host platform's native
+// inspection source.
 func MemoryInfo_() (MemoryInfo, error) {
+	switch runtime.GOOS {
+	case "linux":
+		return linuxMemoryInfo()
+	case "darwin":
+		return darwinMemoryInfo()
+	default:
+		return MemoryInfo{}, fmt.Errorf("memory inspection unsupported on %s", runtime.GOOS)
+	}
+}
+
+func linuxMemoryInfo() (MemoryInfo, error) {
 	f, err := os.Open("/proc/meminfo")
 	if err != nil {
 		return MemoryInfo{}, fmt.Errorf("open /proc/meminfo: %w", err)
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
+	return memoryInfoFromReader(f, "/proc/meminfo")
+}
+
+func memoryInfoFromReader(r io.Reader, source string) (MemoryInfo, error) {
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "MemTotal:") {
@@ -119,27 +138,108 @@ func MemoryInfo_() (MemoryInfo, error) {
 		}, nil
 	}
 	if err := scanner.Err(); err != nil {
-		return MemoryInfo{}, fmt.Errorf("scan /proc/meminfo: %w", err)
+		return MemoryInfo{}, fmt.Errorf("scan %s: %w", source, err)
 	}
-	return MemoryInfo{}, fmt.Errorf("MemTotal not found in /proc/meminfo")
+	return MemoryInfo{}, fmt.Errorf("MemTotal not found in %s", source)
 }
 
-// CPUInfo_ reads /proc/cpuinfo and returns CPU model, physical core count, and
-// logical thread count.
+func darwinMemoryInfo() (MemoryInfo, error) {
+	value, err := sysctlValue("hw.memsize")
+	if err == nil {
+		total, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return MemoryInfo{}, fmt.Errorf("parse hw.memsize: %w", err)
+		}
+		return MemoryInfo{
+			TotalBytes: total,
+			TotalHuman: FormatBytes(total),
+		}, nil
+	}
+
+	mem, hostinfoErr := darwinMemoryInfoFromHostinfo()
+	if hostinfoErr != nil {
+		return MemoryInfo{}, fmt.Errorf("sysctl hw.memsize: %w; hostinfo: %w", err, hostinfoErr)
+	}
+	return mem, nil
+}
+
+func darwinMemoryInfoFromHostinfo() (MemoryInfo, error) {
+	out, err := exec.Command("hostinfo").Output()
+	if err != nil {
+		return MemoryInfo{}, err
+	}
+	return memoryInfoFromHostinfo(string(out))
+}
+
+func memoryInfoFromHostinfo(text string) (MemoryInfo, error) {
+	const prefix = "Primary memory available:"
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		fields := strings.Fields(strings.TrimSpace(strings.TrimPrefix(line, prefix)))
+		if len(fields) < 2 {
+			break
+		}
+		value, err := strconv.ParseFloat(fields[0], 64)
+		if err != nil {
+			return MemoryInfo{}, fmt.Errorf("parse hostinfo memory: %w", err)
+		}
+
+		var multiplier int64
+		switch strings.ToLower(fields[1]) {
+		case "byte", "bytes":
+			multiplier = 1
+		case "kilobyte", "kilobytes":
+			multiplier = 1024
+		case "megabyte", "megabytes":
+			multiplier = 1024 * 1024
+		case "gigabyte", "gigabytes":
+			multiplier = 1024 * 1024 * 1024
+		default:
+			return MemoryInfo{}, fmt.Errorf("unknown hostinfo memory unit %q", fields[1])
+		}
+		total := int64(value * float64(multiplier))
+		return MemoryInfo{
+			TotalBytes: total,
+			TotalHuman: FormatBytes(total),
+		}, nil
+	}
+	return MemoryInfo{}, fmt.Errorf("primary memory not found in hostinfo")
+}
+
+// CPUInfo_ returns CPU model, physical core count, and logical thread count
+// using the host platform's native inspection source.
 func CPUInfo_() (CPUInfo, error) {
+	switch runtime.GOOS {
+	case "linux":
+		return linuxCPUInfo()
+	case "darwin":
+		return darwinCPUInfo()
+	default:
+		return CPUInfo{}, fmt.Errorf("CPU inspection unsupported on %s", runtime.GOOS)
+	}
+}
+
+func linuxCPUInfo() (CPUInfo, error) {
 	f, err := os.Open("/proc/cpuinfo")
 	if err != nil {
 		return CPUInfo{}, fmt.Errorf("open /proc/cpuinfo: %w", err)
 	}
 	defer f.Close()
 
+	return cpuInfoFromReader(f, "/proc/cpuinfo")
+}
+
+func cpuInfoFromReader(r io.Reader, source string) (CPUInfo, error) {
 	var info CPUInfo
 	physicalIDs := make(map[string]bool)
 	coreIDs := make(map[string]bool)
 	threads := 0
 	currentPhysical := ""
 
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "model name") {
@@ -166,7 +266,7 @@ func CPUInfo_() (CPUInfo, error) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return CPUInfo{}, fmt.Errorf("scan /proc/cpuinfo: %w", err)
+		return CPUInfo{}, fmt.Errorf("scan %s: %w", source, err)
 	}
 
 	info.Threads = threads
@@ -178,6 +278,46 @@ func CPUInfo_() (CPUInfo, error) {
 	}
 
 	return info, nil
+}
+
+func darwinCPUInfo() (CPUInfo, error) {
+	model, _ := sysctlValue("machdep.cpu.brand_string")
+	cores, _ := sysctlInt("hw.physicalcpu")
+	threads, _ := sysctlInt("hw.logicalcpu")
+	if threads <= 0 {
+		threads = runtime.NumCPU()
+	}
+	if cores <= 0 {
+		cores = threads
+	}
+	if model == "" {
+		model = runtime.GOARCH
+	}
+	return CPUInfo{
+		Model:   model,
+		Cores:   cores,
+		Threads: threads,
+	}, nil
+}
+
+func sysctlInt(name string) (int, error) {
+	value, err := sysctlValue(name)
+	if err != nil {
+		return 0, err
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", name, err)
+	}
+	return parsed, nil
+}
+
+func sysctlValue(name string) (string, error) {
+	out, err := exec.Command("sysctl", "-n", name).Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // NetworkInterfaces returns all network interfaces using the standard library.
