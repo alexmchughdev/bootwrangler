@@ -5,9 +5,11 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/alexmchughdev/bootwrangler/internal/editor"
+	"github.com/alexmchughdev/bootwrangler/internal/images"
 	"github.com/alexmchughdev/bootwrangler/internal/library"
 	"github.com/alexmchughdev/bootwrangler/internal/manifest"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
@@ -189,6 +191,32 @@ func (s *Service) OpenInNeovim(path string, readOnly bool) error {
 		return err
 	}
 	return editor.Start(plan)
+}
+
+// ListImages returns all entries in the built-in image catalogue.
+func (s *Service) ListImages() []images.CatalogueEntry {
+	return images.BuiltinCatalogue().Entries
+}
+
+// GetImage returns one catalogue entry by ID, or an error if not found.
+func (s *Service) GetImage(id string) (images.CatalogueEntry, error) {
+	cat := images.BuiltinCatalogue()
+	for _, e := range cat.Entries {
+		if e.ID == id {
+			return e, nil
+		}
+	}
+	return images.CatalogueEntry{}, fmt.Errorf("image not found: %s", id)
+}
+
+// ImageCacheStatus returns the cache status for a specific image version/arch.
+func (s *Service) ImageCacheStatus(id, version, arch string) images.CacheStatus {
+	cat := images.BuiltinCatalogue()
+	_, _, _, img, err := images.FindImage(cat, id, version, arch)
+	if err != nil {
+		return images.CacheStatus{}
+	}
+	return images.CheckCache(images.CacheDir(), id, version, arch, img)
 }
 
 func validationResult(err error) ValidationResult {

@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/alexmchughdev/bootwrangler/internal/editor"
+	"github.com/alexmchughdev/bootwrangler/internal/images"
 	"github.com/alexmchughdev/bootwrangler/internal/library"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
 	"github.com/alexmchughdev/bootwrangler/internal/render"
@@ -17,6 +18,7 @@ Usage:
   bootwrangler <command>
 
 Commands:
+  images      Browse and manage OS image catalogue
   library     Manage the local profile library
   profile     Manage provisioning profiles
   render      Render a profile into unattended installer assets
@@ -34,6 +36,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	switch args[0] {
+	case "images":
+		return runImages(args[1:], stdout, stderr)
 	case "library":
 		return runLibrary(args[1:], stdout, stderr)
 	case "profile":
@@ -288,6 +292,55 @@ func runRender(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "warning: %s\n", w)
 	}
 	return 0
+}
+
+func runImages(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage:")
+		fmt.Fprintln(stderr, "  bootwrangler images list")
+		fmt.Fprintln(stderr, "  bootwrangler images show <id>")
+		return 2
+	}
+
+	cat := images.BuiltinCatalogue()
+
+	switch args[0] {
+	case "list":
+		for _, e := range cat.Entries {
+			fmt.Fprintf(stdout, "%-22s  %-18s  %s\n", e.ID, e.Family, e.Name)
+		}
+		return 0
+
+	case "show":
+		if len(args) != 2 {
+			fmt.Fprintln(stderr, "usage: bootwrangler images show <id>")
+			return 2
+		}
+		id := args[1]
+		for _, e := range cat.Entries {
+			if e.ID != id {
+				continue
+			}
+			fmt.Fprintf(stdout, "id:     %s\n", e.ID)
+			fmt.Fprintf(stdout, "name:   %s\n", e.Name)
+			fmt.Fprintf(stdout, "family: %s\n", e.Family)
+			for _, v := range e.Versions {
+				for _, a := range v.Architectures {
+					for _, img := range a.Images {
+						fmt.Fprintf(stdout, "version: %-10s  arch: %-8s  type: %-6s  url: %s\n",
+							v.Version, a.Arch, img.Type, img.URL)
+					}
+				}
+			}
+			return 0
+		}
+		fmt.Fprintf(stderr, "image not found: %s\n", id)
+		return 1
+
+	default:
+		fmt.Fprintf(stderr, "unknown images command %q\n", args[0])
+		return 2
+	}
 }
 
 func printProfileUsage(writer io.Writer) {
