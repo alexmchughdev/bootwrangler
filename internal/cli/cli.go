@@ -1,12 +1,18 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"strings"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/alexmchughdev/bootwrangler/internal/editor"
 	"github.com/alexmchughdev/bootwrangler/internal/images"
+	"github.com/alexmchughdev/bootwrangler/internal/importer"
+	"github.com/alexmchughdev/bootwrangler/internal/inspect"
 	"github.com/alexmchughdev/bootwrangler/internal/library"
 	"github.com/alexmchughdev/bootwrangler/internal/media"
 	"github.com/alexmchughdev/bootwrangler/internal/policy"
@@ -24,6 +30,8 @@ Usage:
 Commands:
   flash       Flash a whole-drive image onto a USB device
   images      Browse and manage OS image catalogue
+  import      Convert an existing installer config to a BootWrangler profile
+  inspect     Show hardware and OS information for the local machine
   lab         Start and manage QEMU lab VMs
   library     Manage the local profile library
   policy      Check a profile against a policy file
@@ -49,6 +57,10 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runFlash(args[1:], stdout, stderr)
 	case "images":
 		return runImages(args[1:], stdout, stderr)
+	case "import":
+		return runImport(args[1:], stdout, stderr)
+	case "inspect":
+		return runInspect(args[1:], stdout, stderr)
 	case "lab":
 		return runLab(args[1:], stdout, stderr)
 	case "library":
@@ -804,4 +816,97 @@ func printProfileUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "usage:")
 	fmt.Fprintln(writer, "  bootwrangler profile edit <profile.yaml> --editor nvim")
 	fmt.Fprintln(writer, "  bootwrangler profile validate <profile.yaml>")
+}
+
+func runImport(args []string, stdout, stderr io.Writer) int {
+	var content string
+
+	switch {
+	case len(args) == 1 && args[0] == "--stdin":
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		content = string(data)
+	case len(args) == 1:
+		data, err := os.ReadFile(args[0])
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		content = string(data)
+	default:
+		fmt.Fprintln(stderr, "usage: bootwrangler import <file>")
+		fmt.Fprintln(stderr, "       bootwrangler import --stdin")
+		return 2
+	}
+
+	result, err := importer.Import(content)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "# Detected format: %s\n", importer.DetectFormat(content))
+
+	out, err := yaml.Marshal(result.Profile)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	fmt.Fprint(stdout, string(out))
+
+	for _, w := range result.Warnings {
+		fmt.Fprintf(stderr, "# Warning: %s\n", w)
+	}
+	if len(result.UnsupportedFields) > 0 {
+		fmt.Fprintf(stderr, "# Unsupported: %s\n", strings.Join(result.UnsupportedFields, ", "))
+	}
+
+	return 0
+}
+
+func runInspect(args []string, stdout, stderr io.Writer) int {
+	jsonMode := false
+	for _, a := range args {
+		if a == "--json" {
+			jsonMode = true
+		} else {
+			fmt.Fprintln(stderr, "usage: bootwrangler inspect [--json]")
+			return 2
+		}
+	}
+
+	info, err := inspect.GatherHostInfo()
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	if jsonMode {
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(info); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	}
+
+	fmt.Fprintf(stdout, "Hostname:  %s\n", info.Hostname)
+	fmt.Fprintf(stdout, "CPU:       %s (%d cores, %d threads)\n", info.CPU.Model, info.CPU.Cores, info.CPU.Threads)
+	fmt.Fprintf(stdout, "Memory:    %s\n", info.Memory.TotalHuman)
+	if len(info.Interfaces) > 0 {
+		fmt.Fprintln(stdout, "Interfaces:")
+		for _, iface := range info.Interfaces {
+			addrs := strings.Join(iface.Addresses, "  ")
+			if iface.HWAddr != "" {
+				fmt.Fprintf(stdout, "  %-10s %s  %s\n", iface.Name, addrs, iface.HWAddr)
+			} else {
+				fmt.Fprintf(stdout, "  %-10s %s\n", iface.Name, addrs)
+			}
+		}
+	}
+	return 0
 }
