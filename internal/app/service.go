@@ -16,6 +16,7 @@ import (
 	"github.com/alexmchughdev/bootwrangler/internal/render"
 	"github.com/alexmchughdev/bootwrangler/internal/secrets"
 	"github.com/alexmchughdev/bootwrangler/internal/server"
+	"github.com/alexmchughdev/bootwrangler/internal/usb"
 	"github.com/alexmchughdev/bootwrangler/internal/version"
 )
 
@@ -217,6 +218,57 @@ func (s *Service) ImageCacheStatus(id, version, arch string) images.CacheStatus 
 		return images.CacheStatus{}
 	}
 	return images.CheckCache(images.CacheDir(), id, version, arch, img)
+}
+
+// ListDevices returns the currently connected block devices with safety annotations.
+func (s *Service) ListDevices() ([]usb.Device, error) {
+	return usb.ListDevices()
+}
+
+// GetDevice returns the block device with the given path, or an error if not found.
+func (s *Service) GetDevice(path string) (*usb.Device, error) {
+	devices, err := usb.ListDevices()
+	if err != nil {
+		return nil, err
+	}
+	for i := range devices {
+		if devices[i].Path == path {
+			return &devices[i], nil
+		}
+	}
+	return nil, fmt.Errorf("device not found: %s", path)
+}
+
+// PlanFlash validates a flash operation and returns the plan without executing.
+func (s *Service) PlanFlash(devicePath, imagePath string) (usb.FlashPlan, error) {
+	devices, err := usb.ListDevices()
+	if err != nil {
+		return usb.FlashPlan{}, fmt.Errorf("list devices: %w", err)
+	}
+	for _, dev := range devices {
+		if dev.Path == devicePath {
+			return usb.PlanFlash(dev, imagePath, false)
+		}
+	}
+	return usb.FlashPlan{}, fmt.Errorf("device not found: %s", devicePath)
+}
+
+// ExecuteFlash runs a previously validated flash plan.
+// Returns error if device is no longer safe at execution time.
+func (s *Service) ExecuteFlash(plan usb.FlashPlan) error {
+	devices, err := usb.ListDevices()
+	if err != nil {
+		return fmt.Errorf("list devices: %w", err)
+	}
+	for _, dev := range devices {
+		if dev.Path == plan.DevicePath {
+			if !dev.Safe {
+				return fmt.Errorf("device is no longer safe: %s", dev.SafetyNote)
+			}
+			return usb.ExecuteFlash(plan)
+		}
+	}
+	return fmt.Errorf("device not found: %s", plan.DevicePath)
 }
 
 func validationResult(err error) ValidationResult {

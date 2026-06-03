@@ -56,12 +56,39 @@ export interface CacheStatus {
   Verified: boolean;
 }
 
+export interface Partition {
+  Path: string;
+  Name: string;
+  Size: number;
+  SizeHuman: string;
+  Filesystem: string;
+  MountPoint: string;
+  Label: string;
+}
+
+export interface UsbDevice {
+  Path: string;
+  Name: string;
+  Model: string;
+  Size: number;
+  SizeHuman: string;
+  Serial: string;
+  Transport: string;
+  Removable: boolean;
+  MountPoint: string;
+  Partitions: Partition[];
+  Safe: boolean;
+  SafetyNote: string;
+}
+
 interface AppService {
   AvailableRenderers(): Promise<string[]>;
   Health(): Promise<HealthStatus>;
   ListImages(): Promise<CatalogueEntry[]>;
   GetImage(id: string): Promise<CatalogueEntry>;
   ImageCacheStatus(id: string, version: string, arch: string): Promise<CacheStatus>;
+  ListDevices(): Promise<UsbDevice[]>;
+  GetDevice(path: string): Promise<UsbDevice>;
   LoadProfile(path: string): Promise<Profile>;
   OpenInNeovim(path: string, readOnly: boolean): Promise<void>;
   RenderProfile(value: Profile, outDir: string): Promise<RenderManifest>;
@@ -156,6 +183,16 @@ export async function imageCacheStatus(
   arch: string,
 ): Promise<CacheStatus> {
   return requireService().ImageCacheStatus(id, version, arch);
+}
+
+export async function listDevices(): Promise<UsbDevice[]> {
+  const service = getService();
+  if (!service) return [];
+  return service.ListDevices();
+}
+
+export async function getDevice(path: string): Promise<UsbDevice> {
+  return requireService().GetDevice(path);
 }
 
 function getService(): AppService | undefined {

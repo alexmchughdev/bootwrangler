@@ -9,6 +9,7 @@ import (
 	"github.com/alexmchughdev/bootwrangler/internal/library"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
 	"github.com/alexmchughdev/bootwrangler/internal/render"
+	"github.com/alexmchughdev/bootwrangler/internal/usb"
 	"github.com/alexmchughdev/bootwrangler/internal/version"
 )
 
@@ -18,10 +19,12 @@ Usage:
   bootwrangler <command>
 
 Commands:
+  flash       Flash a whole-drive image onto a USB device
   images      Browse and manage OS image catalogue
   library     Manage the local profile library
   profile     Manage provisioning profiles
   render      Render a profile into unattended installer assets
+  usb         Discover and inspect USB and block devices
   version     Print the BootWrangler version
 
 Options:
@@ -36,6 +39,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	switch args[0] {
+	case "flash":
+		return runFlash(args[1:], stdout, stderr)
 	case "images":
 		return runImages(args[1:], stdout, stderr)
 	case "library":
@@ -44,6 +49,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runProfile(args[1:], stdout, stderr)
 	case "render":
 		return runRender(args[1:], stdout, stderr)
+	case "usb":
+		return runUSB(args[1:], stdout, stderr)
 	case "version":
 		if len(args) != 1 {
 			fmt.Fprintln(stderr, "usage: bootwrangler version")
@@ -341,6 +348,168 @@ func runImages(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "unknown images command %q\n", args[0])
 		return 2
 	}
+}
+
+func runUSB(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage:")
+		fmt.Fprintln(stderr, "  bootwrangler usb list")
+		fmt.Fprintln(stderr, "  bootwrangler usb partitions <device>")
+		return 2
+	}
+
+	switch args[0] {
+	case "list":
+		devices, err := usb.ListDevices()
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if len(devices) == 0 {
+			fmt.Fprintln(stdout, "no block devices found")
+			return 0
+		}
+		fmt.Fprintf(stdout, "%-16s %-28s %-10s %-8s %-10s %s\n",
+			"PATH", "MODEL", "SIZE", "TRAN", "REMOVABLE", "SAFE")
+		for _, d := range devices {
+			removable := "no"
+			if d.Removable {
+				removable = "yes"
+			}
+			safe := "SAFE"
+			if !d.Safe {
+				safe = "UNSAFE: " + d.SafetyNote
+			}
+			fmt.Fprintf(stdout, "%-16s %-28s %-10s %-8s %-10s %s\n",
+				d.Path, d.Model, d.SizeHuman, d.Transport, removable, safe)
+		}
+		return 0
+
+	case "partitions":
+		if len(args) != 2 {
+			fmt.Fprintln(stderr, "usage: bootwrangler usb partitions <device>")
+			return 2
+		}
+		devicePath := args[1]
+		devices, err := usb.ListDevices()
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		for _, d := range devices {
+			if d.Path != devicePath {
+				continue
+			}
+			fmt.Fprintf(stdout, "device: %s (%s)\n", d.Path, d.SizeHuman)
+			if len(d.Partitions) == 0 {
+				fmt.Fprintln(stdout, "no partitions")
+				return 0
+			}
+			fmt.Fprintf(stdout, "%-16s %-10s %-10s %-16s %s\n",
+				"PATH", "SIZE", "FSTYPE", "MOUNTPOINT", "LABEL")
+			for _, p := range d.Partitions {
+				fmt.Fprintf(stdout, "%-16s %-10s %-10s %-16s %s\n",
+					p.Path, p.SizeHuman, p.Filesystem, p.MountPoint, p.Label)
+			}
+			return 0
+		}
+		fmt.Fprintf(stderr, "device not found: %s\n", devicePath)
+		return 1
+
+	default:
+		fmt.Fprintf(stderr, "unknown usb command %q\n", args[0])
+		return 2
+	}
+}
+
+func runFlash(args []string, stdout, stderr io.Writer) int {
+	var imagePath string
+	var devicePath string
+	var dryRun bool
+	var confirm string
+
+	i := 0
+	for i < len(args) {
+		switch args[i] {
+		case "--device":
+			if i+1 >= len(args) {
+				fmt.Fprintln(stderr, "flash: --device requires a path argument")
+				return 2
+			}
+			devicePath = args[i+1]
+			i += 2
+		case "--dry-run":
+			dryRun = true
+			i++
+		case "--confirm":
+			if i+1 >= len(args) {
+				fmt.Fprintln(stderr, "flash: --confirm requires a device path argument")
+				return 2
+			}
+			confirm = args[i+1]
+			i += 2
+		default:
+			if imagePath != "" {
+				fmt.Fprintln(stderr, "flash: unexpected argument:", args[i])
+				return 2
+			}
+			imagePath = args[i]
+			i++
+		}
+	}
+
+	if imagePath == "" || devicePath == "" {
+		fmt.Fprintln(stderr, "usage: bootwrangler flash <image-path> --device /dev/sdX [--dry-run | --confirm /dev/sdX]")
+		return 2
+	}
+
+	devices, err := usb.ListDevices()
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	var target *usb.Device
+	for i := range devices {
+		if devices[i].Path == devicePath {
+			target = &devices[i]
+			break
+		}
+	}
+	if target == nil {
+		fmt.Fprintf(stderr, "device not found: %s\n", devicePath)
+		return 1
+	}
+
+	plan, err := usb.PlanFlash(*target, imagePath, dryRun)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "Flash plan:\n")
+	fmt.Fprintf(stdout, "  image:   %s (%s)\n", plan.ImagePath, plan.ImageSizeHuman)
+	fmt.Fprintf(stdout, "  device:  %s (%s)\n", plan.DevicePath, plan.DeviceSizeHuman)
+	fmt.Fprintf(stdout, "  command: %s\n", plan.Command)
+
+	if dryRun {
+		fmt.Fprintln(stdout, "Dry run — no changes written.")
+		return 0
+	}
+
+	if confirm != devicePath {
+		fmt.Fprintln(stderr, "WARNING: This will permanently erase all data on the device.")
+		fmt.Fprintln(stderr, "Add --dry-run to preview or --confirm <device> to execute.")
+		return 2
+	}
+
+	fmt.Fprintf(stdout, "Flashing %s to %s...\n", plan.ImagePath, plan.DevicePath)
+	if err := usb.ExecuteFlash(plan); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	fmt.Fprintln(stdout, "Flash complete.")
+	return 0
 }
 
 func printProfileUsage(writer io.Writer) {
