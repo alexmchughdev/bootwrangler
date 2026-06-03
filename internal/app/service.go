@@ -10,10 +10,13 @@ import (
 
 	"github.com/alexmchughdev/bootwrangler/internal/editor"
 	"github.com/alexmchughdev/bootwrangler/internal/images"
+	"github.com/alexmchughdev/bootwrangler/internal/importer"
+	"github.com/alexmchughdev/bootwrangler/internal/inspect"
 	"github.com/alexmchughdev/bootwrangler/internal/library"
 	"github.com/alexmchughdev/bootwrangler/internal/manifest"
 	"github.com/alexmchughdev/bootwrangler/internal/media"
 	"github.com/alexmchughdev/bootwrangler/internal/policy"
+	"github.com/alexmchughdev/bootwrangler/internal/presets"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
 	"github.com/alexmchughdev/bootwrangler/internal/render"
 	"github.com/alexmchughdev/bootwrangler/internal/secrets"
@@ -87,12 +90,13 @@ func (s *Service) AvailableRenderers() []string {
 }
 
 // RenderProfile renders one profile into outDir and returns the manifest.
-func (s *Service) RenderProfile(value profile.Profile, outDir string) (manifest.Manifest, error) {
+// serverBaseURL is embedded into generated iPXE boot entries; pass empty string to omit it.
+func (s *Service) RenderProfile(value profile.Profile, outDir, serverBaseURL string) (manifest.Manifest, error) {
 	r, err := render.Lookup(value.OS.Family)
 	if err != nil {
 		return manifest.Manifest{}, err
 	}
-	opts := render.Options{OutDir: outDir}
+	opts := render.Options{OutDir: outDir, ServerBaseURL: serverBaseURL}
 	return r.Render(value, opts)
 }
 
@@ -331,6 +335,45 @@ func (s *Service) CheckPolicy(policyYAML string, snap policy.ProfileSnapshot) (p
 		return policy.CheckResult{}, err
 	}
 	return policy.Check(p, snap), nil
+}
+
+// ImportConfig auto-detects the installer config format and converts it to a BootWrangler profile.
+func (s *Service) ImportConfig(content string) (importer.ImportResult, error) {
+	return importer.Import(content)
+}
+
+// DetectConfigFormat returns the detected installer config format name.
+func (s *Service) DetectConfigFormat(content string) string {
+	return string(importer.DetectFormat(content))
+}
+
+// GatherHostInfo returns basic hardware and OS information about the local machine.
+func (s *Service) GatherHostInfo() (inspect.HostInfo, error) {
+	return inspect.GatherHostInfo()
+}
+
+// ListPackagePresets returns all built-in package presets.
+func (s *Service) ListPackagePresets() []presets.PackagePreset {
+	return presets.AllPackagePresets()
+}
+
+// ExpandPackagePresets resolves preset names to a deduplicated package list.
+func (s *Service) ExpandPackagePresets(names []string, osFamily string) ([]string, error) {
+	return presets.ExpandPresets(names, osFamily)
+}
+
+// ListRolePresets returns all built-in role presets.
+func (s *Service) ListRolePresets() []presets.RolePreset {
+	return presets.AllRolePresets()
+}
+
+// ExpandRolePreset resolves a role preset name to packages, services, and groups for the given OS family.
+func (s *Service) ExpandRolePreset(name, osFamily string) ([]string, []string, []string, error) {
+	r, err := presets.GetRole(name)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return presets.ExpandRole(r, osFamily)
 }
 
 func validationResult(err error) ValidationResult {
