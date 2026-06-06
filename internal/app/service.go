@@ -266,6 +266,16 @@ func (s *Service) ListImages() []images.CatalogueEntry {
 	return images.BuiltinCatalogue().Entries
 }
 
+// ListCustomImages returns the user-defined custom OS images.
+func (s *Service) ListCustomImages() ([]images.CustomImage, error) {
+	return images.LoadDefaultCustomImages()
+}
+
+// CustomImagesPath returns the default path for user custom image definitions.
+func (s *Service) CustomImagesPath() string {
+	return images.CustomImagesPath()
+}
+
 // GetImage returns one catalogue entry by ID, or an error if not found.
 func (s *Service) GetImage(id string) (images.CatalogueEntry, error) {
 	cat := images.BuiltinCatalogue()

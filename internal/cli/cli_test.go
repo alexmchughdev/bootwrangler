@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -143,6 +145,40 @@ func TestRunImagesList(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "ubuntu") {
 		t.Fatalf("Run() stdout = %q, want ubuntu image listing", stdout.String())
+	}
+}
+
+func TestRunImagesCustomList(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	catalogueDir := filepath.Join(dir, ".bootwrangler", "catalogue")
+	if err := os.MkdirAll(catalogueDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	customYAML := []byte(`
+images:
+  - id: company-os
+    name: Company OS
+    source:
+      type: local-file
+      path: /tmp/company-os.iso
+    compatibility:
+      whole_drive: true
+`)
+	if err := os.WriteFile(filepath.Join(catalogueDir, "custom-images.yaml"), customYAML, 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run([]string{"images", "custom", "list"}, &stdout, &stderr)
+
+	if exitCode != 0 {
+		t.Fatalf("Run() exit code = %d, want 0; stderr = %q", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "company-os") {
+		t.Fatalf("Run() stdout = %q, want custom image id", stdout.String())
 	}
 }
 

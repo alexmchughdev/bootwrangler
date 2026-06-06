@@ -825,6 +825,31 @@ p {
   gap: 16px;
 }
 
+.custom-image-panel {
+  margin-top: 2px;
+}
+
+.custom-image-list {
+  display: grid;
+  gap: 10px;
+}
+
+.custom-image-entry {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr) minmax(220px, 1.4fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid #1f2f46;
+}
+
+.custom-image-source {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #93a9c4;
+  font-size: 11px;
+}
+
 .image-card {
   display: flex;
   flex-direction: column;

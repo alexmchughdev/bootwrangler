@@ -473,6 +473,9 @@ func runImages(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "  bootwrangler images list")
 		fmt.Fprintln(stderr, "  bootwrangler images show <id>")
 		fmt.Fprintln(stderr, "  bootwrangler images download <id> <version> <arch>")
+		fmt.Fprintln(stderr, "  bootwrangler images custom path")
+		fmt.Fprintln(stderr, "  bootwrangler images custom list")
+		fmt.Fprintln(stderr, "  bootwrangler images custom validate")
 		return 2
 	}
 
@@ -547,8 +550,48 @@ func runImages(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "done: %s\n", destPath)
 		return 0
 
+	case "custom":
+		return runImagesCustom(args[1:], stdout, stderr)
+
 	default:
 		fmt.Fprintf(stderr, "unknown images command %q\n", args[0])
+		return 2
+	}
+}
+
+func runImagesCustom(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage:")
+		fmt.Fprintln(stderr, "  bootwrangler images custom path")
+		fmt.Fprintln(stderr, "  bootwrangler images custom list")
+		fmt.Fprintln(stderr, "  bootwrangler images custom validate")
+		return 2
+	}
+
+	switch args[0] {
+	case "path":
+		fmt.Fprintln(stdout, images.CustomImagesPath())
+		return 0
+	case "list":
+		list, err := images.LoadDefaultCustomImages()
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		for _, img := range list {
+			fmt.Fprintf(stdout, "%-22s  %-12s  %s\n", img.ID, img.Source.Type, img.Name)
+		}
+		return 0
+	case "validate":
+		list, err := images.LoadDefaultCustomImages()
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "custom images valid: %d\n", len(list))
+		return 0
+	default:
+		fmt.Fprintf(stderr, "unknown images custom command %q\n", args[0])
 		return 2
 	}
 }

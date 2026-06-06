@@ -2,8 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import {
   type CacheStatus,
   type CatalogueEntry,
+  type CustomImage,
+  customImagesPath,
   downloadImage,
   imageCacheStatus,
+  listCustomImages,
   listImages,
 } from "../api/backend";
 
@@ -59,6 +62,8 @@ function cacheStatusPresentation(status: CacheStatus): CacheStatusPresentation {
 
 export default function Images() {
   const [entries, setEntries] = useState<CatalogueEntry[]>([]);
+  const [customImages, setCustomImages] = useState<CustomImage[]>([]);
+  const [customPath, setCustomPath] = useState("");
   const [cacheMap, setCacheMap] = useState<CacheMap>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -108,8 +113,14 @@ export default function Images() {
       setLoading(true);
       setError("");
       try {
-        const catalogue = await listImages();
+        const [catalogue, custom, path] = await Promise.all([
+          listImages(),
+          listCustomImages(),
+          customImagesPath(),
+        ]);
         setEntries(catalogue);
+        setCustomImages(custom);
+        setCustomPath(path);
         await fetchCacheStatuses(catalogue);
       } catch (err) {
         setError(String(err));
@@ -123,8 +134,14 @@ export default function Images() {
     setRefreshing(true);
     setError("");
     try {
-      const catalogue = await listImages();
+      const [catalogue, custom, path] = await Promise.all([
+        listImages(),
+        listCustomImages(),
+        customImagesPath(),
+      ]);
       setEntries(catalogue);
+      setCustomImages(custom);
+      setCustomPath(path);
       await fetchCacheStatuses(catalogue);
     } catch (err) {
       setError(String(err));
@@ -167,96 +184,140 @@ export default function Images() {
 
       {loading ? (
         <p className="library-empty">Loading catalogue…</p>
-      ) : entries.length === 0 ? (
+      ) : entries.length === 0 && customImages.length === 0 ? (
         <p className="library-empty">No images available.</p>
       ) : (
-        <div className="image-list">
-          {entries.map((entry) => (
-            <article className="panel image-card" key={entry.ID}>
-              <div className="image-card-header">
-                <div className="image-card-title">
-                  <span className="panel-label">{entry.Family}</span>
-                  <strong className="image-name">{entry.Name}</strong>
-                  <code className="image-id">{entry.ID}</code>
+        <>
+          <div className="image-list">
+            {entries.map((entry) => (
+              <article className="panel image-card" key={entry.ID}>
+                <div className="image-card-header">
+                  <div className="image-card-title">
+                    <span className="panel-label">{entry.Family}</span>
+                    <strong className="image-name">{entry.Name}</strong>
+                    <code className="image-id">{entry.ID}</code>
+                  </div>
                 </div>
-              </div>
 
-              <div className="image-versions">
-                {entry.Versions.map((ver) => (
-                  <div className="image-version-row" key={ver.Version}>
-                    <span className="image-version-label">v{ver.Version}</span>
-                    <div className="image-arch-list">
-                      {ver.Architectures.map((archEntry) => {
-                        const key = cacheKey(entry.ID, ver.Version, archEntry.Arch);
-                        const status = cacheMap[key];
-                        const statusPresentation =
-                          status !== undefined ? cacheStatusPresentation(status) : undefined;
-                        const firstImg = archEntry.Images[0];
-                        const isDownloading = !!downloading[key];
-                        const dlError = downloadErrors[key];
-                        return (
-                          <div className="image-arch-entry" key={archEntry.Arch}>
-                            <span className="image-arch-badge">{archEntry.Arch}</span>
+                <div className="image-versions">
+                  {entry.Versions.map((ver) => (
+                    <div className="image-version-row" key={ver.Version}>
+                      <span className="image-version-label">v{ver.Version}</span>
+                      <div className="image-arch-list">
+                        {ver.Architectures.map((archEntry) => {
+                          const key = cacheKey(entry.ID, ver.Version, archEntry.Arch);
+                          const status = cacheMap[key];
+                          const statusPresentation =
+                            status !== undefined ? cacheStatusPresentation(status) : undefined;
+                          const firstImg = archEntry.Images[0];
+                          const isDownloading = !!downloading[key];
+                          const dlError = downloadErrors[key];
+                          return (
+                            <div className="image-arch-entry" key={archEntry.Arch}>
+                              <span className="image-arch-badge">{archEntry.Arch}</span>
 
-                            {statusPresentation !== undefined ? (
-                              <span className={statusPresentation.className}>
-                                {statusPresentation.label}
-                              </span>
-                            ) : (
-                              <span className="cache-badge cache-badge--unknown">
-                                Checking…
-                              </span>
-                            )}
+                              {statusPresentation !== undefined ? (
+                                <span className={statusPresentation.className}>
+                                  {statusPresentation.label}
+                                </span>
+                              ) : (
+                                <span className="cache-badge cache-badge--unknown">
+                                  Checking…
+                                </span>
+                              )}
 
-                            {firstImg && (
-                              <div className="image-compat-badges">
-                                {firstImg.Compatibility.WholeDrive && (
-                                  <span className="compat-badge">Whole Drive</span>
-                                )}
-                                {firstImg.Compatibility.Partition && (
-                                  <span className="compat-badge">Partition</span>
-                                )}
-                                {firstImg.Compatibility.ISOFileBoot && (
-                                  <span className="compat-badge">ISO File Boot</span>
-                                )}
-                                {firstImg.BootMode.map((mode) => (
-                                  <span className="boot-badge" key={mode}>
-                                    {mode.toUpperCase()}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                              {firstImg && (
+                                <div className="image-compat-badges">
+                                  {firstImg.Compatibility.WholeDrive && (
+                                    <span className="compat-badge">Whole Drive</span>
+                                  )}
+                                  {firstImg.Compatibility.Partition && (
+                                    <span className="compat-badge">Partition</span>
+                                  )}
+                                  {firstImg.Compatibility.ISOFileBoot && (
+                                    <span className="compat-badge">ISO File Boot</span>
+                                  )}
+                                  {firstImg.BootMode.map((mode) => (
+                                    <span className="boot-badge" key={mode}>
+                                      {mode.toUpperCase()}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
 
-                            {statusPresentation?.showDownload && (
-                              <button
-                                className="secondary-action image-download-btn"
-                                disabled={isDownloading}
-                                onClick={() =>
-                                  void handleDownload(entry.ID, ver.Version, archEntry.Arch)
-                                }
-                                type="button"
-                              >
-                                {isDownloading
-                                  ? statusPresentation.downloadingLabel
-                                  : statusPresentation.downloadLabel}
-                              </button>
-                            )}
+                              {statusPresentation?.showDownload && (
+                                <button
+                                  className="secondary-action image-download-btn"
+                                  disabled={isDownloading}
+                                  onClick={() =>
+                                    void handleDownload(entry.ID, ver.Version, archEntry.Arch)
+                                  }
+                                  type="button"
+                                >
+                                  {isDownloading
+                                    ? statusPresentation.downloadingLabel
+                                    : statusPresentation.downloadLabel}
+                                </button>
+                              )}
 
-                            {dlError && (
-                              <span className="image-dl-error" title={dlError}>
-                                Failed
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
+                              {dlError && (
+                                <span className="image-dl-error" title={dlError}>
+                                  Failed
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <section className="panel custom-image-panel">
+            <div className="image-card-header">
+              <div className="image-card-title">
+                <span className="panel-label">custom</span>
+                <strong className="image-name">Custom Images</strong>
+                {customPath && <code className="image-id">{customPath}</code>}
+              </div>
+            </div>
+
+            {customImages.length === 0 ? (
+              <p className="library-empty">No custom images configured.</p>
+            ) : (
+              <div className="custom-image-list">
+                {customImages.map((img) => (
+                  <div className="custom-image-entry" key={img.ID}>
+                    <div className="image-card-title">
+                      <strong className="image-name">{img.Name}</strong>
+                      <code className="image-id">{img.ID}</code>
+                    </div>
+                    <span className="cache-badge cache-badge--cached">
+                      {img.Source.Type}
+                    </span>
+                    <div className="image-compat-badges">
+                      {img.Compatibility.WholeDrive && (
+                        <span className="compat-badge">Whole Drive</span>
+                      )}
+                      {img.Compatibility.Partition && (
+                        <span className="compat-badge">Partition</span>
+                      )}
+                      {img.Compatibility.ISOFileBoot && (
+                        <span className="compat-badge">ISO File Boot</span>
+                      )}
+                    </div>
+                    <code className="custom-image-source">
+                      {img.Source.Type === "local-file" ? img.Source.Path : img.Source.URL}
+                    </code>
                   </div>
                 ))}
               </div>
-            </article>
-          ))}
-        </div>
+            )}
+          </section>
+        </>
       )}
     </div>
   );

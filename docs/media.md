@@ -70,6 +70,40 @@ Cache states shown in the desktop image catalogue:
 Checksum failures remove the newly downloaded image and any stale verification
 marker so flashing workflows do not treat an unverified image as safe.
 
+## Custom images
+
+User-defined images are loaded from:
+
+```text
+~/.bootwrangler/catalogue/custom-images.yaml
+```
+
+Example:
+
+```yaml
+images:
+  - id: company-os
+    name: Company OS
+    source:
+      type: local-file
+      path: /path/to/company-os.iso
+    checksum:
+      type: sha256
+      value: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    compatibility:
+      whole_drive: true
+      partition: false
+      iso_file_boot: true
+```
+
+Supported custom image sources:
+
+- `local-file`: references an existing image file by path.
+- `url`: references an absolute `http` or `https` image URL.
+
+Custom images must declare at least one compatibility mode. Checksums are
+optional, but when present they must be valid `sha256` or `md5` hex values.
+
 ## Contained provisioning mode
 
 Rendered installer assets can be written directly to a mounted USB partition so the machine boots and installs without a network provisioning server:

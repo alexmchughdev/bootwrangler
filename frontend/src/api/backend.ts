@@ -50,6 +50,25 @@ export interface CatalogueEntry {
   Versions: VersionEntry[];
 }
 
+export interface CustomSource {
+  Type: string;
+  Path: string;
+  URL: string;
+}
+
+export interface Checksum {
+  Type: string;
+  Value: string;
+}
+
+export interface CustomImage {
+  ID: string;
+  Name: string;
+  Source: CustomSource;
+  Checksum?: Checksum;
+  Compatibility: { WholeDrive: boolean; Partition: boolean; ISOFileBoot: boolean };
+}
+
 export interface CacheStatus {
   Cached: boolean;
   Path: string;
@@ -212,6 +231,8 @@ interface AppService {
   AvailableRenderers(): Promise<string[]>;
   Health(): Promise<HealthStatus>;
   ListImages(): Promise<CatalogueEntry[]>;
+  ListCustomImages(): Promise<CustomImage[]>;
+  CustomImagesPath(): Promise<string>;
   GetImage(id: string): Promise<CatalogueEntry>;
   ImageCacheStatus(id: string, version: string, arch: string): Promise<CacheStatus>;
   DownloadImage(id: string, version: string, arch: string): Promise<string>;
@@ -345,6 +366,18 @@ export async function listImages(): Promise<CatalogueEntry[]> {
   const service = getService();
   if (!service) return [];
   return service.ListImages();
+}
+
+export async function listCustomImages(): Promise<CustomImage[]> {
+  const service = getService();
+  if (!service) return [];
+  return service.ListCustomImages();
+}
+
+export async function customImagesPath(): Promise<string> {
+  const service = getService();
+  if (!service) return "";
+  return service.CustomImagesPath();
 }
 
 export async function getImage(id: string): Promise<CatalogueEntry> {

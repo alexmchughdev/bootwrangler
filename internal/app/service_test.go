@@ -190,3 +190,41 @@ func TestServicePlanCatalogueFlashRequiresCachedImageBeforeDeviceProbe(t *testin
 		t.Fatalf("PlanCatalogueFlash() error = %q, want cache message", err.Error())
 	}
 }
+
+func TestServiceListCustomImages(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	catalogueDir := filepath.Join(dir, ".bootwrangler", "catalogue")
+	if err := os.MkdirAll(catalogueDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	customYAML := []byte(`
+images:
+  - id: company-os
+    name: Company OS
+    source:
+      type: local-file
+      path: /tmp/company-os.iso
+    compatibility:
+      whole_drive: true
+      iso_file_boot: true
+`)
+	if err := os.WriteFile(filepath.Join(catalogueDir, "custom-images.yaml"), customYAML, 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	svc := NewService()
+	got, err := svc.ListCustomImages()
+	if err != nil {
+		t.Fatalf("ListCustomImages() error = %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("ListCustomImages() len = %d, want 1", len(got))
+	}
+	if got[0].ID != "company-os" {
+		t.Fatalf("ListCustomImages()[0].ID = %q, want company-os", got[0].ID)
+	}
+	if gotPath := svc.CustomImagesPath(); gotPath != filepath.Join(catalogueDir, "custom-images.yaml") {
+		t.Fatalf("CustomImagesPath() = %q, want custom catalogue path", gotPath)
+	}
+}
