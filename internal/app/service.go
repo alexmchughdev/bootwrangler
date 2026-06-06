@@ -368,6 +368,22 @@ func (s *Service) PlanCatalogueFlash(devicePath, id, version, arch string) (usb.
 	return s.PlanFlash(devicePath, imagePath)
 }
 
+// PlanCustomImageFlash validates flashing a local custom image to a whole device.
+func (s *Service) PlanCustomImageFlash(devicePath, id string) (usb.FlashPlan, error) {
+	img, err := defaultCustomImage(id)
+	if err != nil {
+		return usb.FlashPlan{}, err
+	}
+	if !img.Compatibility.WholeDrive {
+		return usb.FlashPlan{}, fmt.Errorf("custom image %s is not marked as whole-drive compatible", id)
+	}
+	imagePath, err := images.ResolveCustomImageFile(img)
+	if err != nil {
+		return usb.FlashPlan{}, err
+	}
+	return s.PlanFlash(devicePath, imagePath)
+}
+
 // PlanPartitionFlash validates flashing an image to a specific partition.
 func (s *Service) PlanPartitionFlash(devicePath, partitionPath, imagePath string) (usb.FlashPlan, error) {
 	devices, err := usb.ListDevices()
@@ -405,6 +421,22 @@ func (s *Service) PlanCataloguePartitionFlash(devicePath, partitionPath, id, ver
 	return s.PlanPartitionFlash(devicePath, partitionPath, imagePath)
 }
 
+// PlanCustomImagePartitionFlash validates flashing a local custom image to a selected partition.
+func (s *Service) PlanCustomImagePartitionFlash(devicePath, partitionPath, id string) (usb.FlashPlan, error) {
+	img, err := defaultCustomImage(id)
+	if err != nil {
+		return usb.FlashPlan{}, err
+	}
+	if !img.Compatibility.Partition {
+		return usb.FlashPlan{}, fmt.Errorf("custom image %s is not marked as partition-flash compatible", id)
+	}
+	imagePath, err := images.ResolveCustomImageFile(img)
+	if err != nil {
+		return usb.FlashPlan{}, err
+	}
+	return s.PlanPartitionFlash(devicePath, partitionPath, imagePath)
+}
+
 // ExecuteFlash runs a previously validated flash plan.
 // Returns error if device is no longer safe at execution time.
 func (s *Service) ExecuteFlash(plan usb.FlashPlan) error {
@@ -430,6 +462,14 @@ func cachedImagePath(id, version, arch string, img images.ArchImage) (string, er
 			images.ImageName(id, version))
 	}
 	return status.Path, nil
+}
+
+func defaultCustomImage(id string) (images.CustomImage, error) {
+	list, err := images.LoadDefaultCustomImages()
+	if err != nil {
+		return images.CustomImage{}, err
+	}
+	return images.FindCustomImage(list, id)
 }
 
 // PlanMediaBuild parses the recipe YAML, looks up the device size, and returns a BuildPlan.

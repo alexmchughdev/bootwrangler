@@ -2,24 +2,35 @@ import { useCallback, useEffect, useState } from "react";
 import {
   type CacheStatus,
   type CatalogueEntry,
+  type CustomImage,
   type FlashPlan,
   type UsbDevice,
   executeFlash,
   imageCacheStatus,
   listDevices,
+  listCustomImages,
   listImages,
   planCatalogueFlash,
+  planCustomImageFlash,
 } from "../api/backend";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface SelectedImage {
+interface SelectedCatalogueImage {
+  kind: "catalogue";
   entry: CatalogueEntry;
   version: string;
   arch: string;
 }
+
+interface SelectedCustomImage {
+  kind: "custom";
+  image: CustomImage;
+}
+
+type SelectedImage = SelectedCatalogueImage | SelectedCustomImage;
 
 type Step = "select-image" | "select-device" | "confirm";
 
@@ -27,6 +38,13 @@ type CacheMap = Record<string, CacheStatus>;
 
 function cacheKey(id: string, version: string, arch: string): string {
   return `${id}/${version}/${arch}`;
+}
+
+function selectedImageLabel(img: SelectedImage): string {
+  if (img.kind === "custom") {
+    return `${img.image.Name} / custom`;
+  }
+  return `${img.entry.Name} - v${img.version} / ${img.arch}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +144,7 @@ interface SelectImageStepProps {
 
 function SelectImageStep({ onNext }: SelectImageStepProps) {
   const [entries, setEntries] = useState<CatalogueEntry[]>([]);
+  const [customImages, setCustomImages] = useState<CustomImage[]>([]);
   const [cacheMap, setCacheMap] = useState<CacheMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -165,8 +184,12 @@ function SelectImageStep({ onNext }: SelectImageStepProps) {
       setLoading(true);
       setError("");
       try {
-        const catalogue = await listImages();
+        const [catalogue, custom] = await Promise.all([
+          listImages(),
+          listCustomImages(),
+        ]);
         setEntries(catalogue);
+        setCustomImages(custom);
         await fetchCacheStatuses(catalogue);
       } catch (err) {
         setError(String(err));
@@ -184,6 +207,9 @@ function SelectImageStep({ onNext }: SelectImageStepProps) {
       ),
     ),
   );
+  const wholeDriveCustomImages = customImages.filter(
+    (img) => img.Compatibility.WholeDrive,
+  );
 
   return (
     <div className="flash-step-panel">
@@ -196,7 +222,7 @@ function SelectImageStep({ onNext }: SelectImageStepProps) {
 
       {loading ? (
         <p className="library-empty">Loading catalogue…</p>
-      ) : wholeDriveEntries.length === 0 ? (
+      ) : wholeDriveEntries.length === 0 && wholeDriveCustomImages.length === 0 ? (
         <p className="library-empty">No whole-drive compatible images available.</p>
       ) : (
         <div className="image-list">
@@ -211,7 +237,7 @@ function SelectImageStep({ onNext }: SelectImageStepProps) {
                 const status = cacheMap[key];
                 const rowKey = `${entry.ID}/${ver.Version}/${archEntry.Arch}`;
                 const isSelected =
-                  selected !== null &&
+                  selected?.kind === "catalogue" &&
                   selected.entry.ID === entry.ID &&
                   selected.version === ver.Version &&
                   selected.arch === archEntry.Arch;
@@ -227,6 +253,7 @@ function SelectImageStep({ onNext }: SelectImageStepProps) {
                     }
                     onClick={() =>
                       setSelected({
+                        kind: "catalogue",
                         entry,
                         version: ver.Version,
                         arch: archEntry.Arch,
@@ -268,6 +295,39 @@ function SelectImageStep({ onNext }: SelectImageStepProps) {
               }),
             ),
           )}
+          {wholeDriveCustomImages.map((img) => {
+            const isSelected = selected?.kind === "custom" && selected.image.ID === img.ID;
+            return (
+              <button
+                key={`custom/${img.ID}`}
+                type="button"
+                className={
+                  isSelected
+                    ? "flash-image-row flash-image-row--selected"
+                    : "flash-image-row"
+                }
+                onClick={() => setSelected({ kind: "custom", image: img })}
+              >
+                <div className="flash-image-row-main">
+                  <div className="flash-image-row-title">
+                    <span className="panel-label">custom</span>
+                    <strong className="image-name">{img.Name}</strong>
+                    <span className="image-id">{img.ID}</span>
+                  </div>
+                  <div className="image-arch-entry">
+                    <span className="cache-badge cache-badge--cached">
+                      {img.Source.Type}
+                    </span>
+                    <span className="compat-badge">Whole Drive</span>
+                    {img.Compatibility.ISOFileBoot && (
+                      <span className="compat-badge">ISO File Boot</span>
+                    )}
+                  </div>
+                </div>
+                {isSelected && <span className="flash-selected-check">&#10003;</span>}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -329,12 +389,15 @@ function SelectDeviceStep({ selectedImage, onBack, onNext }: SelectDeviceStepPro
     setPlanError("");
     setPlanning(true);
     try {
-      const p = await planCatalogueFlash(
-        device.Path,
-        selectedImage.entry.ID,
-        selectedImage.version,
-        selectedImage.arch,
-      );
+      const p =
+        selectedImage.kind === "custom"
+          ? await planCustomImageFlash(device.Path, selectedImage.image.ID)
+          : await planCatalogueFlash(
+              device.Path,
+              selectedImage.entry.ID,
+              selectedImage.version,
+              selectedImage.arch,
+            );
       setPlan(p);
     } catch (err) {
       setPlanError(String(err));
@@ -364,9 +427,7 @@ function SelectDeviceStep({ selectedImage, onBack, onNext }: SelectDeviceStepPro
 
       <div className="flash-image-summary">
         <span className="panel-label">Selected image</span>
-        <span>
-          {selectedImage.entry.Name} &mdash; v{selectedImage.version} / {selectedImage.arch}
-        </span>
+        <span>{selectedImageLabel(selectedImage)}</span>
       </div>
 
       {error && <p className="render-error">{error}</p>}

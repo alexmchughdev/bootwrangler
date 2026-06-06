@@ -1,7 +1,10 @@
 package images
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -110,6 +113,35 @@ func UpsertCustomImage(path string, img CustomImage) error {
 	return SaveCustomImages(path, list)
 }
 
+// FindCustomImage returns the custom image with the requested ID.
+func FindCustomImage(list []CustomImage, id string) (CustomImage, error) {
+	for _, img := range list {
+		if img.ID == id {
+			return img, nil
+		}
+	}
+	return CustomImage{}, fmt.Errorf("custom image not found: %s", id)
+}
+
+// ResolveCustomImageFile validates a local custom-image source and checksum.
+func ResolveCustomImageFile(img CustomImage) (string, error) {
+	if img.Source.Type != "local-file" {
+		return "", fmt.Errorf("custom image %s uses source type %q; download it before flashing",
+			img.ID, img.Source.Type)
+	}
+	info, err := os.Stat(img.Source.Path)
+	if err != nil {
+		return "", fmt.Errorf("custom image %s: stat %s: %w", img.ID, img.Source.Path, err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("custom image %s: source path is a directory: %s", img.ID, img.Source.Path)
+	}
+	if err := verifyCustomImageChecksum(img.Source.Path, img); err != nil {
+		return "", err
+	}
+	return img.Source.Path, nil
+}
+
 // ValidateCustomImages checks user-provided custom image metadata.
 func ValidateCustomImages(list []CustomImage) error {
 	seen := map[string]bool{}
@@ -175,6 +207,39 @@ func validateCustomChecksum(img CustomImage) error {
 	}
 	if len(img.Checksum.Value) != wantLen || !hexPattern.MatchString(img.Checksum.Value) {
 		return fmt.Errorf("custom images: image %q: invalid %s checksum", img.ID, img.Checksum.Type)
+	}
+	return nil
+}
+
+func verifyCustomImageChecksum(path string, img CustomImage) error {
+	if img.Checksum == nil {
+		return nil
+	}
+	switch strings.ToLower(img.Checksum.Type) {
+	case "sha256":
+		return VerifySHA256(path, img.Checksum.Value)
+	case "md5":
+		return verifyMD5(path, img.Checksum.Value)
+	default:
+		return fmt.Errorf("custom image %s: unsupported checksum type %q", img.ID, img.Checksum.Type)
+	}
+}
+
+func verifyMD5(path, expectedHex string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("verify: open %s: %w", path, err)
+	}
+	defer f.Close()
+
+	h := md5.New() //nolint:gosec // MD5 is supported only for matching legacy published checksums.
+	if _, err := io.Copy(h, f); err != nil {
+		return fmt.Errorf("verify: hash %s: %w", path, err)
+	}
+	got := hex.EncodeToString(h.Sum(nil))
+	if !strings.EqualFold(got, expectedHex) {
+		return fmt.Errorf("verify: checksum mismatch for %s: expected %s, got %s",
+			filepath.Base(path), expectedHex, got)
 	}
 	return nil
 }

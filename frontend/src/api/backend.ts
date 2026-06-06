@@ -243,6 +243,7 @@ interface AppService {
   OpenInNeovim(path: string, readOnly: boolean): Promise<void>;
   PlanFlash(devicePath: string, imagePath: string): Promise<FlashPlan>;
   PlanCatalogueFlash(devicePath: string, id: string, version: string, arch: string): Promise<FlashPlan>;
+  PlanCustomImageFlash(devicePath: string, id: string): Promise<FlashPlan>;
   PlanPartitionFlash(devicePath: string, partitionPath: string, imagePath: string): Promise<FlashPlan>;
   PlanCataloguePartitionFlash(
     devicePath: string,
@@ -250,6 +251,11 @@ interface AppService {
     id: string,
     version: string,
     arch: string,
+  ): Promise<FlashPlan>;
+  PlanCustomImagePartitionFlash(
+    devicePath: string,
+    partitionPath: string,
+    id: string,
   ): Promise<FlashPlan>;
   ExecuteFlash(plan: FlashPlan): Promise<void>;
   PlanMediaBuild(recipeYAML: string, devicePath: string): Promise<BuildPlan>;
@@ -431,6 +437,13 @@ export async function planCatalogueFlash(
   return requireService().PlanCatalogueFlash(devicePath, id, version, arch);
 }
 
+export async function planCustomImageFlash(
+  devicePath: string,
+  id: string,
+): Promise<FlashPlan> {
+  return requireService().PlanCustomImageFlash(devicePath, id);
+}
+
 export async function planPartitionFlash(
   devicePath: string,
   partitionPath: string,
@@ -453,6 +466,14 @@ export async function planCataloguePartitionFlash(
     version,
     arch,
   );
+}
+
+export async function planCustomImagePartitionFlash(
+  devicePath: string,
+  partitionPath: string,
+  id: string,
+): Promise<FlashPlan> {
+  return requireService().PlanCustomImagePartitionFlash(devicePath, partitionPath, id);
 }
 
 export async function executeFlash(plan: FlashPlan): Promise<void> {

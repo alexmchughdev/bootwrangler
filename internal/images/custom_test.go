@@ -1,6 +1,10 @@
 package images
 
 import (
+	"crypto/md5"
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -81,6 +85,78 @@ func TestSaveAndUpsertCustomImages(t *testing.T) {
 	}
 	if got[1].ID != "rescue-os" {
 		t.Fatalf("second custom image id = %q, want rescue-os", got[1].ID)
+	}
+}
+
+func TestFindCustomImage(t *testing.T) {
+	list := []CustomImage{
+		validCustomImage("company-os"),
+		validCustomImage("rescue-os"),
+	}
+
+	got, err := FindCustomImage(list, "rescue-os")
+	if err != nil {
+		t.Fatalf("FindCustomImage() error = %v", err)
+	}
+	if got.ID != "rescue-os" {
+		t.Fatalf("FindCustomImage().ID = %q, want rescue-os", got.ID)
+	}
+}
+
+func TestResolveCustomImageFileVerifiesChecksum(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "company-os.iso")
+	content := []byte("custom image bytes")
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	sum := sha256.Sum256(content)
+	img := validCustomImage("company-os")
+	img.Source.Path = path
+	img.Checksum = &Checksum{Type: "sha256", Value: hex.EncodeToString(sum[:])}
+
+	got, err := ResolveCustomImageFile(img)
+	if err != nil {
+		t.Fatalf("ResolveCustomImageFile() error = %v", err)
+	}
+	if got != path {
+		t.Fatalf("ResolveCustomImageFile() = %q, want %q", got, path)
+	}
+}
+
+func TestResolveCustomImageFileVerifiesMD5Checksum(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.img")
+	content := []byte("legacy image bytes")
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	sum := md5.Sum(content)
+	img := validCustomImage("legacy-os")
+	img.Source.Path = path
+	img.Checksum = &Checksum{Type: "md5", Value: hex.EncodeToString(sum[:])}
+
+	if _, err := ResolveCustomImageFile(img); err != nil {
+		t.Fatalf("ResolveCustomImageFile() error = %v", err)
+	}
+}
+
+func TestResolveCustomImageFileRejectsChecksumMismatch(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "company-os.iso")
+	if err := os.WriteFile(path, []byte("custom image bytes"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	img := validCustomImage("company-os")
+	img.Source.Path = path
+	img.Checksum = &Checksum{
+		Type:  "sha256",
+		Value: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+	}
+
+	_, err := ResolveCustomImageFile(img)
+	if err == nil {
+		t.Fatal("ResolveCustomImageFile() error = nil, want checksum mismatch")
+	}
+	if !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Fatalf("ResolveCustomImageFile() error = %q, want mismatch message", err.Error())
 	}
 }
 

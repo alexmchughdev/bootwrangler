@@ -262,3 +262,59 @@ func TestServiceSaveCustomImage(t *testing.T) {
 		t.Fatalf("ListCustomImages()[0].ID = %q, want company-os", got[0].ID)
 	}
 }
+
+func TestServicePlanCustomImageFlashRejectsIncompatibleBeforeDeviceProbe(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	svc := NewService()
+	if err := svc.SaveCustomImage(images.CustomImage{
+		ID:   "partition-only",
+		Name: "Partition Only",
+		Source: images.CustomSource{
+			Type: "local-file",
+			Path: "/tmp/partition-only.img",
+		},
+		Compatibility: images.Compatibility{
+			Partition: true,
+		},
+	}); err != nil {
+		t.Fatalf("SaveCustomImage() error = %v", err)
+	}
+
+	_, err := svc.PlanCustomImageFlash("/dev/sdb", "partition-only")
+	if err == nil {
+		t.Fatal("PlanCustomImageFlash() error = nil, want compatibility error")
+	}
+	if !strings.Contains(err.Error(), "not marked as whole-drive compatible") {
+		t.Fatalf("PlanCustomImageFlash() error = %q, want compatibility message", err.Error())
+	}
+}
+
+func TestServicePlanCustomImagePartitionFlashRejectsMissingSourceBeforeDeviceProbe(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	svc := NewService()
+	if err := svc.SaveCustomImage(images.CustomImage{
+		ID:   "missing-source",
+		Name: "Missing Source",
+		Source: images.CustomSource{
+			Type: "local-file",
+			Path: filepath.Join(dir, "missing.img"),
+		},
+		Compatibility: images.Compatibility{
+			Partition: true,
+		},
+	}); err != nil {
+		t.Fatalf("SaveCustomImage() error = %v", err)
+	}
+
+	_, err := svc.PlanCustomImagePartitionFlash("/dev/sdb", "/dev/sdb1", "missing-source")
+	if err == nil {
+		t.Fatal("PlanCustomImagePartitionFlash() error = nil, want missing source error")
+	}
+	if !strings.Contains(err.Error(), "stat") {
+		t.Fatalf("PlanCustomImagePartitionFlash() error = %q, want source stat message", err.Error())
+	}
+}

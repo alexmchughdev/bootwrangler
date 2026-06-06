@@ -113,6 +113,11 @@ bootwrangler images custom list
 bootwrangler images custom validate
 ```
 
+Local-file custom images appear in the whole-drive and partition flash
+workflows when their compatibility flags allow that mode. URL custom images can
+be catalogued now; download and cache support for those entries is handled
+separately from local-file flash planning.
+
 ## Contained provisioning mode
 
 Rendered installer assets can be written directly to a mounted USB partition so the machine boots and installs without a network provisioning server:
