@@ -30,11 +30,11 @@ func ProfilesDir(workspaceDir string) string {
 
 // Entry is a library index record for one stored profile.
 type Entry struct {
-	Name      string    `yaml:"name"`
-	Filename  string    `yaml:"filename"`
-	OSFamily  string    `yaml:"os_family"`
-	OSVersion string    `yaml:"os_version"`
-	UpdatedAt time.Time `yaml:"updated_at"`
+	Name      string    `json:"name" yaml:"name"`
+	Filename  string    `json:"filename" yaml:"filename"`
+	OSFamily  string    `json:"os_family" yaml:"os_family"`
+	OSVersion string    `json:"os_version" yaml:"os_version"`
+	UpdatedAt time.Time `json:"updated_at" yaml:"updated_at"`
 }
 
 // Library manages the local profile store.

@@ -10,6 +10,7 @@ import {
   loadProfile,
   renderProfile,
   saveProfile,
+  type LibraryEntry,
   type VersionEntry,
 } from "../api/backend";
 
@@ -17,14 +18,6 @@ interface BatchRenderResult {
   name: string;
   status: "success" | "error";
   message: string;
-}
-
-interface LibraryEntry {
-  name: string;
-  filename: string;
-  os_family: string;
-  os_version: string;
-  updated_at: string;
 }
 
 interface LibraryService {

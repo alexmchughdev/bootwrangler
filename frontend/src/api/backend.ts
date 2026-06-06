@@ -173,6 +173,14 @@ export interface ImportResult {
   Warnings: string[];
 }
 
+export interface LibraryEntry {
+  name: string;
+  filename: string;
+  os_family: string;
+  os_version: string;
+  updated_at: string;
+}
+
 export interface VersionEntry {
   hash: string;
   message: string;
@@ -297,7 +305,7 @@ interface AppService {
   LabRevertSnapshot(runID: string, name: string): Promise<void>;
   LabDeleteSnapshot(runID: string, name: string): Promise<void>;
   LibraryGet(name: string): Promise<Profile>;
-  LibraryList(): Promise<{ name: string }[]>;
+  LibraryList(): Promise<LibraryEntry[]>;
   LibraryExportBundle(name: string, path: string): Promise<void>;
   LibraryImportBundle(path: string): Promise<string>;
   LibraryCommit(name: string, message: string): Promise<void>;
@@ -586,7 +594,7 @@ export async function libraryGet(name: string): Promise<Profile> {
   return requireService().LibraryGet(name);
 }
 
-export async function libraryList(): Promise<{ name: string }[]> {
+export async function libraryList(): Promise<LibraryEntry[]> {
   const service = getService();
   if (!service) return [];
   return service.LibraryList();

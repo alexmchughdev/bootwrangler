@@ -57,6 +57,10 @@ bootwrangler recipe plan my-usb.yaml --device /dev/sdb
 
 This prints the partition layout and copy actions without writing anything.
 
+The desktop Media Builder includes a recipe composer that can generate this
+nested YAML for boot menu, catalogue image, custom image, rendered profile, and
+storage partitions. The YAML editor remains editable before planning.
+
 The desktop Media Builder also resolves content availability during planning:
 
 - Catalogue images must already be cached, and verified cache markers are shown
