@@ -120,9 +120,26 @@ export interface BuildPlan {
     Label: string;
     SizeBytes: number;
     Filesystem: string;
+    Content: {
+      Type: string;
+      Image?: string;
+      Version?: string;
+      Profile?: string;
+      Bundle?: string;
+    };
+    ContentResolution: {
+      Status: string;
+      Message: string;
+      SourcePath: string;
+      Warnings: string[];
+      Errors: string[];
+    };
     DevicePath: string;
   }>;
   DryRun: boolean;
+  Ready: boolean;
+  Warnings: string[];
+  Errors: string[];
 }
 
 export interface PackagePreset {

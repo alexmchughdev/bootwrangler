@@ -5,13 +5,33 @@ import (
 	"strings"
 )
 
+const (
+	// ContentStatusPlanned means the content is structurally valid but has not
+	// been resolved against local cache or library state.
+	ContentStatusPlanned = "planned"
+	ContentStatusReady   = "ready"
+	ContentStatusWarning = "warning"
+	ContentStatusBlocked = "blocked"
+)
+
+// ContentResolution describes whether partition content can be assembled from
+// local inputs before any destructive media build path runs.
+type ContentResolution struct {
+	Status     string
+	Message    string
+	SourcePath string
+	Warnings   []string
+	Errors     []string
+}
+
 // PartitionAction is one planned step in the build.
 type PartitionAction struct {
-	Label      string
-	SizeBytes  int64
-	Filesystem string
-	Content    PartitionContent
-	DevicePath string // filled in at build time
+	Label             string
+	SizeBytes         int64
+	Filesystem        string
+	Content           PartitionContent
+	ContentResolution ContentResolution
+	DevicePath        string // filled in at build time
 }
 
 // BuildPlan is the validated, ordered sequence of operations.
@@ -22,6 +42,9 @@ type BuildPlan struct {
 	TotalBytes int64
 	Actions    []PartitionAction
 	DryRun     bool
+	Ready      bool
+	Warnings   []string
+	Errors     []string
 }
 
 // PlanBuild validates the recipe against the device and returns a BuildPlan.
@@ -67,6 +90,10 @@ func PlanBuild(recipe Recipe, devicePath string, deviceSizeBytes int64, dryRun b
 			SizeBytes:  sz,
 			Filesystem: p.Filesystem,
 			Content:    p.Content,
+			ContentResolution: ContentResolution{
+				Status:  ContentStatusPlanned,
+				Message: "Content source resolution is pending.",
+			},
 		})
 	}
 
@@ -77,6 +104,7 @@ func PlanBuild(recipe Recipe, devicePath string, deviceSizeBytes int64, dryRun b
 		TotalBytes: totalBytes,
 		Actions:    actions,
 		DryRun:     dryRun,
+		Ready:      true,
 	}, nil
 }
 
@@ -89,10 +117,37 @@ func FormatBuildPlan(plan BuildPlan) string {
 	if plan.DryRun {
 		fmt.Fprintf(&sb, "  mode:        dry-run\n")
 	}
+	if !plan.Ready {
+		fmt.Fprintf(&sb, "  content:     blocked\n")
+	} else if len(plan.Warnings) > 0 {
+		fmt.Fprintf(&sb, "  content:     ready with warnings\n")
+	}
 	fmt.Fprintf(&sb, "  partitions:\n")
 	for i, a := range plan.Actions {
-		fmt.Fprintf(&sb, "    [%d] %-16s  %-10s  %-8s  %s\n",
-			i+1, a.Label, formatBytes(a.SizeBytes), a.Filesystem, string(a.Content.Type))
+		status := a.ContentResolution.Status
+		if status == "" {
+			status = ContentStatusPlanned
+		}
+		fmt.Fprintf(&sb, "    [%d] %-16s  %-10s  %-8s  %-8s  %s\n",
+			i+1, a.Label, formatBytes(a.SizeBytes), a.Filesystem, status, string(a.Content.Type))
+		if a.ContentResolution.Message != "" {
+			fmt.Fprintf(&sb, "        %s\n", a.ContentResolution.Message)
+		}
+		if a.ContentResolution.SourcePath != "" {
+			fmt.Fprintf(&sb, "        source: %s\n", a.ContentResolution.SourcePath)
+		}
+		for _, warning := range a.ContentResolution.Warnings {
+			fmt.Fprintf(&sb, "        warning: %s\n", warning)
+		}
+		for _, err := range a.ContentResolution.Errors {
+			fmt.Fprintf(&sb, "        error: %s\n", err)
+		}
+	}
+	for _, warning := range plan.Warnings {
+		fmt.Fprintf(&sb, "  warning: %s\n", warning)
+	}
+	for _, err := range plan.Errors {
+		fmt.Fprintf(&sb, "  error: %s\n", err)
 	}
 	return sb.String()
 }

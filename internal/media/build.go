@@ -1,6 +1,9 @@
 package media
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // ExecuteBuild executes the given BuildPlan.
 //
@@ -11,6 +14,10 @@ import "fmt"
 // The planning and dry-run paths are fully implemented; live execution
 // is intentionally guarded behind this error.
 func ExecuteBuild(plan BuildPlan) error {
+	if !plan.Ready {
+		return fmt.Errorf("media build: unresolved content: %s", strings.Join(plan.Errors, "; "))
+	}
+
 	if plan.DryRun {
 		return nil
 	}

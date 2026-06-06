@@ -8,7 +8,7 @@ boot:
   menu: ipxe
 
 partitions:
-  - label: BOOTFORGE
+  - label: BOOTWRANGLER
     size: 2G
     filesystem: fat32
     content:

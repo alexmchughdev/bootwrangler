@@ -5,27 +5,42 @@ The media builder creates bootable USB drives with multiple partitions, each con
 ## Recipe format
 
 ```yaml
-label: my-lab-usb
-partition_table: gpt        # gpt | mbr
-boot_menu: grub             # grub | ipxe | none
-boot_mode: [uefi, bios]
+name: lab-usb
+
+device:
+  partition_table: gpt
+
+boot:
+  mode: uefi-bios
+  menu: ipxe
 
 partitions:
-  - label: EFI
-    size: 512MiB
+  - label: BOOTWRANGLER
+    size: 2G
     filesystem: fat32
-    content_type: efi
+    content:
+      type: boot-menu
 
-  - label: ubuntu-server
-    size: 4GiB
-    filesystem: ext4
-    content_type: installer-assets
-    source: /rendered/ubuntu-server/
+  - label: UBUNTU_24
+    size: 6G
+    filesystem: exfat
+    content:
+      type: catalogue-image
+      image: ubuntu-server
+      version: "24.04"
 
-  - label: data
+  - label: ALPINE_AUTO
+    size: 2G
+    filesystem: fat32
+    content:
+      type: rendered-profile
+      profile: alpine-edge-node
+
+  - label: STORAGE
     size: remaining
-    filesystem: ext4
-    content_type: data
+    filesystem: exfat
+    content:
+      type: empty
 ```
 
 ## Validate a recipe
@@ -41,6 +56,17 @@ bootwrangler recipe plan my-usb.yaml --device /dev/sdb
 ```
 
 This prints the partition layout and copy actions without writing anything.
+
+The desktop Media Builder also resolves content availability during planning:
+
+- Catalogue images must already be cached, and verified cache markers are shown
+  when available.
+- Custom local-file images are checked for source-file presence and checksum
+  match when a checksum is configured.
+- Custom URL images can be recorded in the catalogue but are blocked in media
+  plans until download/cache support is added for those entries.
+- Rendered-profile partitions must reference a profile present in the local
+  profile library.
 
 ## Image flash compatibility
 

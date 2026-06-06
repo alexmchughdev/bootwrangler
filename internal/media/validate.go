@@ -102,7 +102,7 @@ func validateContent(label string, c PartitionContent) error {
 		return nil
 	case ContentImageFile:
 		if c.Image == "" {
-			return fmt.Errorf("media recipe: partition %q: image-file content requires image id", label)
+			return fmt.Errorf("media recipe: partition %q: image-file content requires image path", label)
 		}
 		return nil
 	case ContentRenderedProfile:

@@ -495,7 +495,12 @@ func (s *Service) PlanMediaBuild(recipeYAML string, devicePath string) (media.Bu
 		return media.BuildPlan{}, fmt.Errorf("device not found: %s", devicePath)
 	}
 
-	return media.PlanBuild(r, devicePath, deviceSize, false)
+	plan, err := media.PlanBuild(r, devicePath, deviceSize, false)
+	if err != nil {
+		return media.BuildPlan{}, err
+	}
+	resolveMediaBuildContent(&plan)
+	return plan, nil
 }
 
 // FormatMediaBuildPlan returns a human-readable summary of a BuildPlan.

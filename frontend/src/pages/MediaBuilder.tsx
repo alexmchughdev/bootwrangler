@@ -1,29 +1,87 @@
 import { useState } from "react";
-import { formatMediaBuildPlan, listDevices, planMediaBuild, readRenderedFile, writeTextFile } from "../api/backend";
+import {
+  type BuildPlan,
+  formatMediaBuildPlan,
+  listDevices,
+  planMediaBuild,
+  readRenderedFile,
+  writeTextFile,
+} from "../api/backend";
 
-const YAML_PLACEHOLDER = `# Recipe YAML format:
-# label: my-usb-stick
-# partition_table: gpt
-# partitions:
-#   - label: efi
-#     filesystem: fat32
-#     size: 512MiB
-#     content_type: efi
-#   - label: ubuntu
-#     filesystem: ext4
-#     size: 8GiB
-#     content_type: installer-assets
-#     source: ./ubuntu-server/
-#   - label: data
-#     filesystem: ext4
-#     size: remaining
-#     content_type: data`;
+const YAML_PLACEHOLDER = `name: lab-usb
+device:
+  partition_table: gpt
+boot:
+  mode: uefi-bios
+  menu: ipxe
+partitions:
+  - label: BOOTWRANGLER
+    size: 2G
+    filesystem: fat32
+    content:
+      type: boot-menu
+  - label: UBUNTU_24
+    size: 6G
+    filesystem: exfat
+    content:
+      type: catalogue-image
+      image: ubuntu-server
+      version: "24.04"
+  - label: STORAGE
+    size: remaining
+    filesystem: exfat
+    content:
+      type: empty`;
 
 type PlanState =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "plan"; text: string };
+  | { kind: "plan"; text: string; buildPlan: BuildPlan };
+
+type PlanAction = BuildPlan["Actions"][number];
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const digits = unit <= 1 ? 0 : 1;
+  return `${value.toFixed(digits)} ${units[unit]}`;
+}
+
+function contentLabel(action: PlanAction): string {
+  const content = action.Content;
+  switch (content.Type) {
+    case "catalogue-image":
+    case "custom-image":
+    case "image-file":
+      return [content.Image, content.Version].filter(Boolean).join(" ");
+    case "rendered-profile":
+      return content.Profile ?? "";
+    case "profile-bundle":
+      return content.Bundle ?? "";
+    default:
+      return content.Type;
+  }
+}
+
+function statusClass(status: string): string {
+  switch (status) {
+    case "ready":
+      return "cache-badge cache-badge--cached";
+    case "warning":
+      return "cache-badge cache-badge--unverified";
+    case "blocked":
+      return "cache-badge cache-badge--missing";
+    default:
+      return "cache-badge cache-badge--unknown";
+  }
+}
 
 export default function MediaBuilder() {
   const [yaml, setYaml] = useState("");
@@ -50,7 +108,7 @@ export default function MediaBuilder() {
     try {
       const builtPlan = await planMediaBuild(yaml, devicePath);
       const text = await formatMediaBuildPlan(builtPlan);
-      setPlan({ kind: "plan", text });
+      setPlan({ kind: "plan", text, buildPlan: builtPlan });
     } catch (err) {
       setPlan({ kind: "error", message: String(err) });
     }
@@ -190,7 +248,98 @@ export default function MediaBuilder() {
             <p className="render-error media-builder-result-text">{plan.message}</p>
           )}
           {plan.kind === "plan" && (
-            <pre className="media-builder-plan-output">{plan.text}</pre>
+            <div className="media-builder-plan">
+              <div className="media-builder-plan-summary">
+                <span className={plan.buildPlan.Ready ? "badge badge-safe" : "badge badge-unsafe"}>
+                  {plan.buildPlan.Ready ? "Ready" : "Blocked"}
+                </span>
+                <span>{plan.buildPlan.RecipeName}</span>
+                <span>{formatBytes(plan.buildPlan.TotalBytes)} planned</span>
+                <span>{formatBytes(plan.buildPlan.DeviceSize)} device</span>
+              </div>
+
+              <table className="file-table media-builder-plan-table">
+                <thead>
+                  <tr>
+                    <th>Partition</th>
+                    <th>Size</th>
+                    <th>Filesystem</th>
+                    <th>Content</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {plan.buildPlan.Actions.map((action) => {
+                    const resolution = action.ContentResolution;
+                    const warnings = resolution.Warnings ?? [];
+                    const errors = resolution.Errors ?? [];
+                    return (
+                      <tr key={action.Label}>
+                        <td>
+                          <strong>{action.Label}</strong>
+                        </td>
+                        <td>{formatBytes(action.SizeBytes)}</td>
+                        <td>{action.Filesystem}</td>
+                        <td>
+                          <div className="media-builder-content-cell">
+                            <span>{action.Content.Type}</span>
+                            {contentLabel(action) !== action.Content.Type && (
+                              <span className="media-builder-content-ref">{contentLabel(action)}</span>
+                            )}
+                            {resolution.SourcePath && (
+                              <span className="file-path">{resolution.SourcePath}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="media-builder-content-cell">
+                            <span className={statusClass(resolution.Status)}>
+                              {resolution.Status || "planned"}
+                            </span>
+                            {resolution.Message && <span>{resolution.Message}</span>}
+                            {warnings.map((warning) => (
+                              <span className="media-builder-warning" key={warning}>
+                                {warning}
+                              </span>
+                            ))}
+                            {errors.map((error) => (
+                              <span className="render-error" key={error}>
+                                {error}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {(plan.buildPlan.Warnings?.length ?? 0) > 0 && (
+                <div className="media-builder-message-list">
+                  {plan.buildPlan.Warnings.map((warning) => (
+                    <span className="media-builder-warning" key={warning}>
+                      {warning}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {(plan.buildPlan.Errors?.length ?? 0) > 0 && (
+                <div className="media-builder-message-list">
+                  {plan.buildPlan.Errors.map((error) => (
+                    <span className="render-error" key={error}>
+                      {error}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <details className="media-builder-plan-details">
+                <summary>Text summary</summary>
+                <pre className="media-builder-plan-output">{plan.text}</pre>
+              </details>
+            </div>
           )}
         </div>
       </div>

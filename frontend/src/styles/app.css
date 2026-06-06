@@ -1486,6 +1486,72 @@ p {
   white-space: pre-wrap;
 }
 
+.media-builder-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.media-builder-plan-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: #dbeafe;
+  font-size: 13px;
+}
+
+.media-builder-plan-table {
+  table-layout: fixed;
+}
+
+.media-builder-plan-table th:nth-child(1),
+.media-builder-plan-table td:nth-child(1) {
+  width: 18%;
+}
+
+.media-builder-plan-table th:nth-child(2),
+.media-builder-plan-table td:nth-child(2) {
+  width: 12%;
+}
+
+.media-builder-plan-table th:nth-child(3),
+.media-builder-plan-table td:nth-child(3) {
+  width: 14%;
+}
+
+.media-builder-plan-table th:nth-child(4),
+.media-builder-plan-table td:nth-child(4) {
+  width: 28%;
+}
+
+.media-builder-content-cell,
+.media-builder-message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.media-builder-content-ref {
+  color: #93c5fd;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.media-builder-warning {
+  color: #fbbf24;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.media-builder-plan-details summary {
+  color: #93c5fd;
+  cursor: pointer;
+  font-size: 13px;
+}
+
 .media-builder-plan-output {
   margin: 0;
   padding: 16px;
