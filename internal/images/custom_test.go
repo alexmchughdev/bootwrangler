@@ -48,6 +48,42 @@ func TestLoadCustomImagesMissingFileReturnsEmpty(t *testing.T) {
 	}
 }
 
+func TestSaveAndUpsertCustomImages(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".bootwrangler", "catalogue", "custom-images.yaml")
+	first := validCustomImage("company-os")
+	first.Name = "Company OS"
+	if err := UpsertCustomImage(path, first); err != nil {
+		t.Fatalf("UpsertCustomImage() first error = %v", err)
+	}
+
+	second := validCustomImage("rescue-os")
+	second.Name = "Rescue OS"
+	if err := UpsertCustomImage(path, second); err != nil {
+		t.Fatalf("UpsertCustomImage() second error = %v", err)
+	}
+
+	replacement := validCustomImage("company-os")
+	replacement.Name = "Company OS Updated"
+	replacement.Compatibility = Compatibility{WholeDrive: true, ISOFileBoot: true}
+	if err := UpsertCustomImage(path, replacement); err != nil {
+		t.Fatalf("UpsertCustomImage() replacement error = %v", err)
+	}
+
+	got, err := LoadCustomImages(path)
+	if err != nil {
+		t.Fatalf("LoadCustomImages() error = %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("LoadCustomImages() len = %d, want 2", len(got))
+	}
+	if got[0].ID != "company-os" || got[0].Name != "Company OS Updated" {
+		t.Fatalf("first custom image = %#v, want updated company-os", got[0])
+	}
+	if got[1].ID != "rescue-os" {
+		t.Fatalf("second custom image id = %q, want rescue-os", got[1].ID)
+	}
+}
+
 func TestValidateCustomImagesRejectsDuplicateID(t *testing.T) {
 	list := []CustomImage{
 		validCustomImage("company-os"),

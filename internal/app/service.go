@@ -276,6 +276,11 @@ func (s *Service) CustomImagesPath() string {
 	return images.CustomImagesPath()
 }
 
+// SaveCustomImage adds or replaces one user-defined custom image.
+func (s *Service) SaveCustomImage(img images.CustomImage) error {
+	return images.UpsertCustomImage(images.CustomImagesPath(), img)
+}
+
 // GetImage returns one catalogue entry by ID, or an error if not found.
 func (s *Service) GetImage(id string) (images.CatalogueEntry, error) {
 	cat := images.BuiltinCatalogue()

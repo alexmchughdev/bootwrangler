@@ -233,6 +233,7 @@ interface AppService {
   ListImages(): Promise<CatalogueEntry[]>;
   ListCustomImages(): Promise<CustomImage[]>;
   CustomImagesPath(): Promise<string>;
+  SaveCustomImage(img: CustomImage): Promise<void>;
   GetImage(id: string): Promise<CatalogueEntry>;
   ImageCacheStatus(id: string, version: string, arch: string): Promise<CacheStatus>;
   DownloadImage(id: string, version: string, arch: string): Promise<string>;
@@ -378,6 +379,10 @@ export async function customImagesPath(): Promise<string> {
   const service = getService();
   if (!service) return "";
   return service.CustomImagesPath();
+}
+
+export async function saveCustomImage(img: CustomImage): Promise<void> {
+  return requireService().SaveCustomImage(img);
 }
 
 export async function getImage(id: string): Promise<CatalogueEntry> {

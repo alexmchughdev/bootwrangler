@@ -834,6 +834,69 @@ p {
   gap: 10px;
 }
 
+.custom-image-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 12px;
+  align-items: end;
+  padding: 14px 0;
+  border-top: 1px solid #1f2f46;
+}
+
+.custom-image-form label,
+.custom-image-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #9fb4cc;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.custom-image-form input,
+.custom-image-form select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #253a55;
+  border-radius: 4px;
+  background: #071420;
+  color: #e5edf7;
+  padding: 7px 9px;
+}
+
+.custom-image-modes {
+  margin: 0;
+  border: 1px solid #253a55;
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+.custom-image-modes legend {
+  padding: 0 4px;
+}
+
+.custom-image-modes label {
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  font-weight: 500;
+}
+
+.custom-image-modes input {
+  width: auto;
+  min-height: auto;
+}
+
+.custom-image-checksum {
+  display: grid;
+  grid-template-columns: 95px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.custom-image-form .primary-action {
+  min-height: 34px;
+}
+
 .custom-image-entry {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr) minmax(220px, 1.4fr);
@@ -848,6 +911,13 @@ p {
   overflow-wrap: anywhere;
   color: #93a9c4;
   font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .custom-image-form,
+  .custom-image-entry {
+    grid-template-columns: 1fr;
+  }
 }
 
 .image-card {

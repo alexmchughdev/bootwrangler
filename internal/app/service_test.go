@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alexmchughdev/bootwrangler/internal/images"
 	"github.com/alexmchughdev/bootwrangler/internal/profile"
 )
 
@@ -226,5 +227,38 @@ images:
 	}
 	if gotPath := svc.CustomImagesPath(); gotPath != filepath.Join(catalogueDir, "custom-images.yaml") {
 		t.Fatalf("CustomImagesPath() = %q, want custom catalogue path", gotPath)
+	}
+}
+
+func TestServiceSaveCustomImage(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	svc := NewService()
+	err := svc.SaveCustomImage(images.CustomImage{
+		ID:   "company-os",
+		Name: "Company OS",
+		Source: images.CustomSource{
+			Type: "local-file",
+			Path: "/tmp/company-os.iso",
+		},
+		Compatibility: images.Compatibility{
+			WholeDrive:  true,
+			ISOFileBoot: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveCustomImage() error = %v", err)
+	}
+
+	got, err := svc.ListCustomImages()
+	if err != nil {
+		t.Fatalf("ListCustomImages() error = %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("ListCustomImages() len = %d, want 1", len(got))
+	}
+	if got[0].ID != "company-os" {
+		t.Fatalf("ListCustomImages()[0].ID = %q, want company-os", got[0].ID)
 	}
 }

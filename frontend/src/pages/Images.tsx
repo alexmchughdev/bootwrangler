@@ -8,6 +8,7 @@ import {
   imageCacheStatus,
   listCustomImages,
   listImages,
+  saveCustomImage,
 } from "../api/backend";
 
 interface VersionArchKey {
@@ -25,6 +26,32 @@ interface CacheStatusPresentation {
   downloadLabel: string;
   downloadingLabel: string;
 }
+
+interface CustomImageDraft {
+  id: string;
+  name: string;
+  sourceType: "local-file" | "url";
+  path: string;
+  url: string;
+  wholeDrive: boolean;
+  partition: boolean;
+  isoFileBoot: boolean;
+  checksumType: "sha256" | "md5";
+  checksumValue: string;
+}
+
+const emptyCustomImageDraft: CustomImageDraft = {
+  id: "",
+  name: "",
+  sourceType: "local-file",
+  path: "",
+  url: "",
+  wholeDrive: true,
+  partition: false,
+  isoFileBoot: true,
+  checksumType: "sha256",
+  checksumValue: "",
+};
 
 function cacheKey(id: string, version: string, arch: string): string {
   return `${id}/${version}/${arch}`;
@@ -70,6 +97,9 @@ export default function Images() {
   const [error, setError] = useState("");
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
   const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({});
+  const [customDraft, setCustomDraft] = useState<CustomImageDraft>(emptyCustomImageDraft);
+  const [savingCustom, setSavingCustom] = useState(false);
+  const [customSaveError, setCustomSaveError] = useState("");
 
   function collectKeys(catalogue: CatalogueEntry[]): VersionArchKey[] {
     const keys: VersionArchKey[] = [];
@@ -108,41 +138,37 @@ export default function Images() {
     [],
   );
 
+  const loadImageData = useCallback(async () => {
+    const [catalogue, custom, path] = await Promise.all([
+      listImages(),
+      listCustomImages(),
+      customImagesPath(),
+    ]);
+    setEntries(catalogue);
+    setCustomImages(custom);
+    setCustomPath(path);
+    await fetchCacheStatuses(catalogue);
+  }, [fetchCacheStatuses]);
+
   useEffect(() => {
     void (async () => {
       setLoading(true);
       setError("");
       try {
-        const [catalogue, custom, path] = await Promise.all([
-          listImages(),
-          listCustomImages(),
-          customImagesPath(),
-        ]);
-        setEntries(catalogue);
-        setCustomImages(custom);
-        setCustomPath(path);
-        await fetchCacheStatuses(catalogue);
+        await loadImageData();
       } catch (err) {
         setError(String(err));
       } finally {
         setLoading(false);
       }
     })();
-  }, [fetchCacheStatuses]);
+  }, [loadImageData]);
 
   async function handleRefresh() {
     setRefreshing(true);
     setError("");
     try {
-      const [catalogue, custom, path] = await Promise.all([
-        listImages(),
-        listCustomImages(),
-        customImagesPath(),
-      ]);
-      setEntries(catalogue);
-      setCustomImages(custom);
-      setCustomPath(path);
-      await fetchCacheStatuses(catalogue);
+      await loadImageData();
     } catch (err) {
       setError(String(err));
     } finally {
@@ -163,6 +189,37 @@ export default function Images() {
       setDownloadErrors((prev) => ({ ...prev, [key]: String(err) }));
     } finally {
       setDownloading((prev) => { const n = { ...prev }; delete n[key]; return n; });
+    }
+  }
+
+  async function handleSaveCustomImage() {
+    setSavingCustom(true);
+    setCustomSaveError("");
+    try {
+      const checksumValue = customDraft.checksumValue.trim();
+      await saveCustomImage({
+        ID: customDraft.id.trim(),
+        Name: customDraft.name.trim(),
+        Source: {
+          Type: customDraft.sourceType,
+          Path: customDraft.sourceType === "local-file" ? customDraft.path.trim() : "",
+          URL: customDraft.sourceType === "url" ? customDraft.url.trim() : "",
+        },
+        Checksum: checksumValue
+          ? { Type: customDraft.checksumType, Value: checksumValue }
+          : undefined,
+        Compatibility: {
+          WholeDrive: customDraft.wholeDrive,
+          Partition: customDraft.partition,
+          ISOFileBoot: customDraft.isoFileBoot,
+        },
+      });
+      setCustomDraft(emptyCustomImageDraft);
+      await loadImageData();
+    } catch (err) {
+      setCustomSaveError(String(err));
+    } finally {
+      setSavingCustom(false);
     }
   }
 
@@ -284,6 +341,141 @@ export default function Images() {
                 {customPath && <code className="image-id">{customPath}</code>}
               </div>
             </div>
+
+            <div className="custom-image-form">
+              <label>
+                ID
+                <input
+                  onChange={(event) =>
+                    setCustomDraft((prev) => ({ ...prev, id: event.target.value }))
+                  }
+                  type="text"
+                  value={customDraft.id}
+                />
+              </label>
+              <label>
+                Name
+                <input
+                  onChange={(event) =>
+                    setCustomDraft((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                  type="text"
+                  value={customDraft.name}
+                />
+              </label>
+              <label>
+                Source
+                <select
+                  onChange={(event) =>
+                    setCustomDraft((prev) => ({
+                      ...prev,
+                      sourceType: event.target.value as CustomImageDraft["sourceType"],
+                    }))
+                  }
+                  value={customDraft.sourceType}
+                >
+                  <option value="local-file">Local file</option>
+                  <option value="url">URL</option>
+                </select>
+              </label>
+              <label>
+                {customDraft.sourceType === "local-file" ? "Path" : "URL"}
+                <input
+                  onChange={(event) =>
+                    setCustomDraft((prev) =>
+                      customDraft.sourceType === "local-file"
+                        ? { ...prev, path: event.target.value }
+                        : { ...prev, url: event.target.value },
+                    )
+                  }
+                  type="text"
+                  value={
+                    customDraft.sourceType === "local-file"
+                      ? customDraft.path
+                      : customDraft.url
+                  }
+                />
+              </label>
+              <fieldset className="custom-image-modes">
+                <legend>Compatibility</legend>
+                <label>
+                  <input
+                    checked={customDraft.wholeDrive}
+                    onChange={(event) =>
+                      setCustomDraft((prev) => ({
+                        ...prev,
+                        wholeDrive: event.target.checked,
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  Whole Drive
+                </label>
+                <label>
+                  <input
+                    checked={customDraft.partition}
+                    onChange={(event) =>
+                      setCustomDraft((prev) => ({
+                        ...prev,
+                        partition: event.target.checked,
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  Partition
+                </label>
+                <label>
+                  <input
+                    checked={customDraft.isoFileBoot}
+                    onChange={(event) =>
+                      setCustomDraft((prev) => ({
+                        ...prev,
+                        isoFileBoot: event.target.checked,
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  ISO File Boot
+                </label>
+              </fieldset>
+              <label>
+                Checksum
+                <div className="custom-image-checksum">
+                  <select
+                    onChange={(event) =>
+                      setCustomDraft((prev) => ({
+                        ...prev,
+                        checksumType: event.target.value as CustomImageDraft["checksumType"],
+                      }))
+                    }
+                    value={customDraft.checksumType}
+                  >
+                    <option value="sha256">SHA256</option>
+                    <option value="md5">MD5</option>
+                  </select>
+                  <input
+                    onChange={(event) =>
+                      setCustomDraft((prev) => ({
+                        ...prev,
+                        checksumValue: event.target.value,
+                      }))
+                    }
+                    type="text"
+                    value={customDraft.checksumValue}
+                  />
+                </div>
+              </label>
+              <button
+                className="primary-action"
+                disabled={savingCustom}
+                onClick={() => void handleSaveCustomImage()}
+                type="button"
+              >
+                {savingCustom ? "Saving..." : "Save Custom Image"}
+              </button>
+            </div>
+
+            {customSaveError && <p className="render-error">{customSaveError}</p>}
 
             {customImages.length === 0 ? (
               <p className="library-empty">No custom images configured.</p>

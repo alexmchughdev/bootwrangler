@@ -59,6 +59,57 @@ func LoadCustomImagesFromBytes(data []byte) ([]CustomImage, error) {
 	return cat.Images, nil
 }
 
+// SaveCustomImages validates and writes custom image definitions atomically.
+func SaveCustomImages(path string, list []CustomImage) error {
+	if err := ValidateCustomImages(list); err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(CustomImageCatalogue{Images: list})
+	if err != nil {
+		return fmt.Errorf("custom images: encode: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("custom images: mkdir: %w", err)
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".custom-images-*")
+	if err != nil {
+		return fmt.Errorf("custom images: temp file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("custom images: write: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("custom images: close: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("custom images: replace: %w", err)
+	}
+	return nil
+}
+
+// UpsertCustomImage validates and writes one custom image by ID.
+func UpsertCustomImage(path string, img CustomImage) error {
+	list, err := LoadCustomImages(path)
+	if err != nil {
+		return err
+	}
+	replaced := false
+	for i := range list {
+		if list[i].ID == img.ID {
+			list[i] = img
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		list = append(list, img)
+	}
+	return SaveCustomImages(path, list)
+}
+
 // ValidateCustomImages checks user-provided custom image metadata.
 func ValidateCustomImages(list []CustomImage) error {
 	seen := map[string]bool{}

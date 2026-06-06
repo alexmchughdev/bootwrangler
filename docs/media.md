@@ -104,6 +104,15 @@ Supported custom image sources:
 Custom images must declare at least one compatibility mode. Checksums are
 optional, but when present they must be valid `sha256` or `md5` hex values.
 
+The desktop Images view can add or replace custom image definitions by ID. The
+CLI can inspect the same file:
+
+```sh
+bootwrangler images custom path
+bootwrangler images custom list
+bootwrangler images custom validate
+```
+
 ## Contained provisioning mode
 
 Rendered installer assets can be written directly to a mounted USB partition so the machine boots and installs without a network provisioning server:
