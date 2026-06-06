@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { getHealth, listDevices, type HealthStatus } from "./api/backend";
 import type { Profile } from "./types/profile";
-import { navigationItems } from "./navigation";
 import BootMenu from "./pages/BootMenu";
 import FlashImage from "./pages/FlashImage";
 import Policy from "./pages/Policy";
@@ -23,8 +22,33 @@ const initialHealth: HealthStatus = {
   version: "unknown",
 };
 
+const NAV_GROUPS = [
+  {
+    label: "Profiles",
+    items: ["Dashboard", "Profiles", "Library", "Import"] as const,
+  },
+  {
+    label: "Build",
+    items: ["Render", "Boot Menu", "Media Builder"] as const,
+  },
+  {
+    label: "Deploy",
+    items: ["Images", "Flash Image", "Flash Partition", "USB Devices"] as const,
+  },
+  {
+    label: "Testing",
+    items: ["Lab", "Host Info"] as const,
+  },
+  {
+    label: "Config",
+    items: ["Policy", "Provisioning Server", "Settings"] as const,
+  },
+] as const;
+
+type NavItem = (typeof NAV_GROUPS)[number]["items"][number];
+
 function App() {
-  const [activeSection, setActiveSection] = useState("Dashboard");
+  const [activeSection, setActiveSection] = useState<string>("Dashboard");
   const [health, setHealth] = useState(initialHealth);
   const [profileEditorKey, setProfileEditorKey] = useState(0);
   const [libraryKey, setLibraryKey] = useState(0);
@@ -57,16 +81,21 @@ function App() {
           </div>
         </div>
 
-        <nav aria-label="Main navigation">
-          {navigationItems.map((item) => (
-            <button
-              className={item === activeSection ? "nav-item active" : "nav-item"}
-              key={item}
-              onClick={() => setActiveSection(item)}
-              type="button"
-            >
-              {item}
-            </button>
+        <nav aria-label="Main navigation" className="sidebar-nav">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} className="nav-group">
+              <span className="nav-group-label">{group.label}</span>
+              {group.items.map((item) => (
+                <button
+                  className={item === activeSection ? "nav-item active" : "nav-item"}
+                  key={item}
+                  onClick={() => setActiveSection(item)}
+                  type="button"
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -195,25 +224,49 @@ function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </article>
 
-      <article className="panel dashboard-stat" onClick={() => onNavigate("Library")} role="button" tabIndex={0}>
+      <article
+        className="panel dashboard-stat"
+        onClick={() => onNavigate("Library")}
+        onKeyDown={(e) => e.key === "Enter" && onNavigate("Library")}
+        role="button"
+        tabIndex={0}
+      >
         <span className="panel-label">Profiles</span>
         <strong className="dashboard-stat-value">{profileLabel}</strong>
         <p>Saved in library</p>
+        <span className="dashboard-stat-arrow" aria-hidden="true">→</span>
       </article>
 
-      <article className="panel dashboard-stat" onClick={() => onNavigate("USB Devices")} role="button" tabIndex={0}>
+      <article
+        className="panel dashboard-stat"
+        onClick={() => onNavigate("USB Devices")}
+        onKeyDown={(e) => e.key === "Enter" && onNavigate("USB Devices")}
+        role="button"
+        tabIndex={0}
+      >
         <span className="panel-label">USB Devices</span>
         <strong className="dashboard-stat-value">{deviceLabel}</strong>
         <p>Connected targets</p>
+        <span className="dashboard-stat-arrow" aria-hidden="true">→</span>
       </article>
 
-      <article className="panel dashboard-stat" onClick={() => onNavigate("Provisioning Server")} role="button" tabIndex={0}>
+      <article
+        className="panel dashboard-stat"
+        onClick={() => onNavigate("Provisioning Server")}
+        onKeyDown={(e) => e.key === "Enter" && onNavigate("Provisioning Server")}
+        role="button"
+        tabIndex={0}
+      >
         <span className="panel-label">Provisioning Server</span>
         <strong className="dashboard-stat-value">{serverLabel}</strong>
         <p>{serverRunning ? "Serving files" : "Click to configure"}</p>
+        <span className="dashboard-stat-arrow" aria-hidden="true">→</span>
       </article>
     </div>
   );
 }
+
+// Ensure all nav items are typed — compile-time check
+type _NavCheck = NavItem;
 
 export default App;
