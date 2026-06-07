@@ -114,6 +114,42 @@ type OSSpecific struct {
 	Ubuntu   *UbuntuOverrides   `json:"ubuntu,omitempty" yaml:"ubuntu,omitempty"`
 	RHELLike *RHELLikeOverrides `json:"rhel_like,omitempty" yaml:"rhel_like,omitempty"`
 	Arch     *ArchOverrides     `json:"arch,omitempty" yaml:"arch,omitempty"`
+	Windows  *WindowsOverrides  `json:"windows,omitempty" yaml:"windows,omitempty"`
+}
+
+// WindowsOverrides describes Windows unattended-setup (autounattend.xml) options.
+type WindowsOverrides struct {
+	// Edition is the Windows image name to install, e.g. "Windows 11 Pro".
+	Edition string `json:"edition" yaml:"edition,omitempty"`
+	// ProductKey is optional; omit for KMS/volume activation or a generic key.
+	ProductKey string `json:"product_key" yaml:"product_key,omitempty"`
+	// Organization and Owner populate the registered-owner fields.
+	Organization string `json:"organization" yaml:"organization,omitempty"`
+	Owner        string `json:"owner" yaml:"owner,omitempty"`
+	// AdminPassword sets the local administrator password. If empty the
+	// renderer emits a placeholder and a warning. Stored in plaintext in the
+	// generated answer file — rotate after deployment.
+	AdminPassword string `json:"admin_password" yaml:"admin_password,omitempty"`
+	// SkipOOBE skips the out-of-box experience (defaults to true in the renderer).
+	SkipOOBE bool `json:"skip_oobe" yaml:"skip_oobe,omitempty"`
+	// DomainJoin optionally enrols the machine into Active Directory.
+	DomainJoin *DomainJoin `json:"domain_join,omitempty" yaml:"domain_join,omitempty"`
+}
+
+// DomainJoin describes Active Directory domain enrollment. Prefer
+// "offline-djoin": the provisioning blob carries no reusable credentials.
+type DomainJoin struct {
+	// Domain is the AD DNS domain, e.g. "corp.example.com".
+	Domain string `json:"domain" yaml:"domain"`
+	// OU is an optional target organizational-unit distinguished name.
+	OU string `json:"ou" yaml:"ou,omitempty"`
+	// Method is one of: offline-djoin | unattend | first-logon.
+	Method string `json:"method" yaml:"method"`
+	// ProvisionBlob is the base64 output of `djoin /provision` (offline-djoin).
+	ProvisionBlob string `json:"provision_blob" yaml:"provision_blob,omitempty"`
+	// JoinUser is the account used to join for the unattend/first-logon methods.
+	// The password is never stored in the profile; it is prompted at run time.
+	JoinUser string `json:"join_user" yaml:"join_user,omitempty"`
 }
 
 // AlpineOverrides describes Alpine-specific installer settings.

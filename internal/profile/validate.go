@@ -12,15 +12,17 @@ import (
 )
 
 var (
-	hostnameLabelPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
-	identifierPattern    = regexp.MustCompile(`^[a-z_][a-z0-9_-]*$`)
-	packagePattern       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.:@/-]*$`)
-	servicePattern       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9@_.:-]*$`)
-	versionPattern       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+	hostnameLabelPattern   = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+	identifierPattern      = regexp.MustCompile(`^[a-z_][a-z0-9_-]*$`)
+	windowsHostnamePattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,15}$`)
+	windowsNamePattern     = regexp.MustCompile(`^[A-Za-z0-9 ._-]+$`)
+	packagePattern         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.:@/-]*$`)
+	servicePattern         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9@_.:-]*$`)
+	versionPattern         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 )
 
 var (
-	supportedFamilies      = setOf("alpine", "ubuntu", "debian", "rocky", "fedora", "arch", "opensuse")
+	supportedFamilies      = setOf("alpine", "ubuntu", "debian", "rocky", "fedora", "arch", "opensuse", "windows")
 	supportedArchitectures = setOf(
 		"x86_64",
 		"aarch64",
@@ -28,14 +30,15 @@ var (
 		"armv7",
 		"riscv64",
 	)
-	supportedDiskModes      = setOf("wipe", "preserve", "manual")
-	supportedFilesystems    = setOf("ext4", "xfs", "btrfs", "f2fs")
-	supportedNetworkModes   = setOf("dhcp", "static")
-	supportedPackagePresets = setOf("minimal", "remote-admin", "vm-guest", "container-host", "developer", "security-basic")
-	supportedAlpineModes    = setOf("sys", "diskless", "data")
-	supportedSELinuxModes   = setOf("enforcing", "permissive", "disabled")
-	supportedFirewallModes  = setOf("enabled", "disabled")
-	supportedArchAURHelpers = setOf("none", "yay", "paru")
+	supportedDiskModes        = setOf("wipe", "preserve", "manual")
+	supportedFilesystems      = setOf("ext4", "xfs", "btrfs", "f2fs", "ntfs")
+	supportedDomainJoinMethod = setOf("offline-djoin", "unattend", "first-logon")
+	supportedNetworkModes     = setOf("dhcp", "static")
+	supportedPackagePresets   = setOf("minimal", "remote-admin", "vm-guest", "container-host", "developer", "security-basic")
+	supportedAlpineModes      = setOf("sys", "diskless", "data")
+	supportedSELinuxModes     = setOf("enforcing", "permissive", "disabled")
+	supportedFirewallModes    = setOf("enabled", "disabled")
+	supportedArchAURHelpers   = setOf("none", "yay", "paru")
 )
 
 // ValidationError reports deterministic profile validation problems.
@@ -58,10 +61,10 @@ func Validate(value Profile) error {
 	}
 
 	validateOS(validator, value.OS)
-	validateSystem(validator, value.System)
+	validateSystem(validator, value.System, value.OS.Family)
 	validateNetwork(validator, value.Network)
 	validateDisk(validator, value.Disk)
-	users := validateUsers(validator, value.Users)
+	users := validateUsers(validator, value.Users, value.OS.Family)
 	validateSSH(validator, value.SSH, users)
 	validatePackages(validator, value.Packages)
 	validateServices(validator, value.Services)
@@ -112,10 +115,16 @@ func validateOS(v *validator, value OS) {
 	}
 }
 
-func validateSystem(v *validator, value System) {
+func validateSystem(v *validator, value System, family string) {
 	v.required("system.hostname", value.Hostname)
-	if value.Hostname != "" && !validHostname(value.Hostname) {
-		v.add("system.hostname %q is invalid", value.Hostname)
+	if value.Hostname != "" {
+		if family == "windows" {
+			if !windowsHostnamePattern.MatchString(value.Hostname) {
+				v.add("system.hostname %q is invalid (Windows names are 1-15 letters, digits, or hyphens)", value.Hostname)
+			}
+		} else if !validHostname(value.Hostname) {
+			v.add("system.hostname %q is invalid", value.Hostname)
+		}
 	}
 	v.required("system.timezone", value.Timezone)
 	if value.Timezone != "" {
@@ -175,7 +184,11 @@ type validatedUsers struct {
 	keyCount int
 }
 
-func validateUsers(v *validator, values []User) validatedUsers {
+func validateUsers(v *validator, values []User, family string) validatedUsers {
+	namePattern := identifierPattern
+	if family == "windows" {
+		namePattern = windowsNamePattern
+	}
 	result := validatedUsers{names: make(stringSet)}
 	if len(values) == 0 {
 		v.add("users must contain at least one user")
@@ -185,7 +198,7 @@ func validateUsers(v *validator, values []User) validatedUsers {
 	for index, user := range values {
 		path := fmt.Sprintf("users[%d]", index)
 		v.required(path+".name", user.Name)
-		if user.Name != "" && !identifierPattern.MatchString(user.Name) {
+		if user.Name != "" && !namePattern.MatchString(user.Name) {
 			v.add("%s.name %q is invalid", path, user.Name)
 		}
 		if result.names.has(user.Name) {
@@ -196,7 +209,7 @@ func validateUsers(v *validator, values []User) validatedUsers {
 		if user.Shell != "" && !strings.HasPrefix(user.Shell, "/") {
 			v.add("%s.shell %q must be an absolute path", path, user.Shell)
 		}
-		validateNamedList(v, path+".groups", user.Groups, identifierPattern)
+		validateNamedList(v, path+".groups", user.Groups, namePattern)
 		for keyIndex, key := range user.SSHKeys {
 			if err := secrets.ValidateSSHPublicKey(key); err != nil {
 				v.add("%s.ssh_keys[%d] is not a valid SSH public key: %v", path, keyIndex, err)
@@ -281,6 +294,20 @@ func validateOSSpecific(v *validator, value OSSpecific) {
 	}
 	if value.Arch != nil && value.Arch.AURHelper != "" && !supportedArchAURHelpers.has(value.Arch.AURHelper) {
 		v.add("os_specific.arch.aur_helper %q is unsupported", value.Arch.AURHelper)
+	}
+	if value.Windows != nil && value.Windows.DomainJoin != nil {
+		dj := value.Windows.DomainJoin
+		v.required("os_specific.windows.domain_join.domain", dj.Domain)
+		v.required("os_specific.windows.domain_join.method", dj.Method)
+		if dj.Method != "" && !supportedDomainJoinMethod.has(dj.Method) {
+			v.add("os_specific.windows.domain_join.method %q is unsupported", dj.Method)
+		}
+		if dj.Method == "offline-djoin" && dj.ProvisionBlob == "" {
+			v.add("os_specific.windows.domain_join.provision_blob is required for offline-djoin")
+		}
+		if (dj.Method == "unattend" || dj.Method == "first-logon") && dj.JoinUser == "" {
+			v.add("os_specific.windows.domain_join.join_user is required for the %q method", dj.Method)
+		}
 	}
 }
 

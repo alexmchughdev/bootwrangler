@@ -53,3 +53,7 @@ docs-site/build/
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Private (not open source)
+PRO-ROADMAP.md
+pro/

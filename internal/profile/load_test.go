@@ -34,6 +34,7 @@ func TestLoadFileExamples(t *testing.T) {
 		"opensuse-server",
 		"rocky-server",
 		"ubuntu-server",
+		"windows-workstation",
 	}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("example profile names = %#v, want %#v", names, want)

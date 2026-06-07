@@ -1,0 +1,65 @@
+name: windows-workstation
+
+os:
+  family: windows
+  version: "11"
+  architecture: x86_64
+
+system:
+  hostname: WIN-EDGE-01
+  timezone: Europe/London
+  keyboard: gb
+  locale: en-GB
+
+network:
+  mode: dhcp
+  interface: auto
+
+disk:
+  mode: wipe
+  target: auto
+  install_mode: image
+  filesystem: ntfs
+  confirm_destructive: true
+
+users:
+  - name: admin
+    groups:
+      - Administrators
+
+ssh:
+  enabled: false
+  permit_root_login: false
+  password_authentication: false
+
+packages:
+  names:
+    - Google.Chrome
+    - 7zip.7zip
+
+services:
+  enable: []
+
+post_install:
+  scripts:
+    - name: baseline.ps1
+      content: |
+        # Disable hibernation on desktops
+        powercfg /hibernate off
+
+os_specific:
+  windows:
+    edition: Windows 11 Pro
+    organization: Example Corp
+    owner: IT Department
+    skip_oobe: true
+    # admin_password is intentionally omitted — the renderer emits a
+    # placeholder and a warning. Set it here or rotate after deployment.
+    domain_join:
+      domain: corp.example.com
+      ou: OU=Workstations,DC=corp,DC=example,DC=com
+      method: offline-djoin
+      # Generate on a domain controller:
+      #   djoin /provision /domain corp.example.com /machine WIN-EDGE-01 /savefile blob.txt
+      # then base64-encode blob.txt into provision_blob.
+      provision_blob: REPLACE_WITH_BASE64_DJOIN_BLOB

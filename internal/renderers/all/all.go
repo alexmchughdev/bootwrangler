@@ -11,4 +11,5 @@ import (
 	_ "github.com/alexmchughdev/bootwrangler/internal/renderers/opensuse"
 	_ "github.com/alexmchughdev/bootwrangler/internal/renderers/rocky"
 	_ "github.com/alexmchughdev/bootwrangler/internal/renderers/ubuntu"
+	_ "github.com/alexmchughdev/bootwrangler/internal/renderers/windows"
 )
