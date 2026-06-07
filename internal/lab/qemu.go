@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 const qemuBin = "qemu-system-x86_64"
@@ -58,7 +57,7 @@ func Start(run *Run) error {
 
 	// Launch QEMU as a background process.
 	cmd := exec.Command(qemuPath, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	setProcessGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		run.State = RunStateFailed
 		run.Error = err.Error()
@@ -95,11 +94,8 @@ func Stop(run *Run) error {
 		return fmt.Errorf("find process %d: %w", pid, err)
 	}
 
-	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		// Process may already be gone — treat as stopped.
-		if err.Error() != "os: process already finished" {
-			return fmt.Errorf("signal qemu: %w", err)
-		}
+	if err := terminateProcess(proc); err != nil {
+		return fmt.Errorf("signal qemu: %w", err)
 	}
 
 	now := timeNow()
@@ -118,9 +114,7 @@ func IsRunning(run *Run) bool {
 	if err != nil {
 		return false
 	}
-	// Signal 0 checks existence without sending a signal.
-	err = proc.Signal(syscall.Signal(0))
-	return err == nil
+	return processAlive(proc)
 }
 
 // pidFile returns the path of the PID file for a run.

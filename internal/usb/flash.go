@@ -3,7 +3,6 @@ package usb
 import (
 	"fmt"
 	"os"
-	"os/exec"
 )
 
 // FlashOptions configures a flash operation.
@@ -91,20 +90,4 @@ func PlanPartitionFlash(dev Device, partition Partition, imagePath string, dryRu
 		Command:         cmd,
 		DryRun:          dryRun,
 	}, nil
-}
-
-// ExecuteFlash runs the dd command described by plan unless plan.DryRun is true.
-func ExecuteFlash(plan FlashPlan) error {
-	if plan.DryRun {
-		return nil
-	}
-	if err := exec.Command("dd",
-		"if="+plan.ImagePath,
-		"of="+plan.DevicePath,
-		"bs=4M",
-		"status=progress",
-	).Run(); err != nil {
-		return fmt.Errorf("flash: dd: %w", err)
-	}
-	return nil
 }
