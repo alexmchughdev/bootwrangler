@@ -44,6 +44,8 @@ tmp/
 node_modules/
 frontend/package.json.md5
 frontend/wailsjs/
+docs-site/.docusaurus/
+docs-site/build/
 
 # OS metadata
 .DS_Store

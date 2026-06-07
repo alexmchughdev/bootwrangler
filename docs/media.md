@@ -1,3 +1,9 @@
+---
+title: Media Builder
+description: Compose multi-partition USB media from repeatable recipes.
+sidebar_position: 4
+---
+
 # Media Builder
 
 The media builder creates bootable USB drives with multiple partitions, each containing different OS images or installer assets.

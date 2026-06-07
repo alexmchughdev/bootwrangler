@@ -1,3 +1,9 @@
+---
+title: Profiles
+description: Profile schema, rendering, importing, and policy checks.
+sidebar_position: 3
+---
+
 # Profiles
 
 A profile is a YAML document that describes one target machine's operating system, network, disk, SSH, and user configuration. BootWrangler renders a profile into the unattended installer assets for the chosen OS family.

@@ -2,7 +2,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 LDFLAGS := -X github.com/alexmchughdev/bootwrangler/internal/version.Value=$(VERSION)
 BUILD_DIR := dist
 
-.PHONY: all build build-desktop build-cli test lint fmt clean
+.PHONY: all build build-desktop build-cli docs-build docs-dev test lint fmt clean
 
 all: build
 
@@ -16,6 +16,14 @@ build-desktop:
 
 ## build-cli: alias for build
 build-cli: build
+
+## docs-build: build the public Docusaurus documentation site
+docs-build:
+	cd docs-site && npm run build
+
+## docs-dev: run the public documentation site locally
+docs-dev:
+	cd docs-site && npm run start
 
 ## test: run Go and frontend tests
 test:
@@ -36,3 +44,4 @@ fmt:
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -rf frontend/dist
+	rm -rf docs-site/build

@@ -1,3 +1,9 @@
+---
+title: Quickstart
+description: Build, run, and test BootWrangler locally.
+sidebar_position: 2
+---
+
 # Quickstart
 
 ## Requirements

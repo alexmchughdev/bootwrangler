@@ -48,6 +48,22 @@ Build the desktop application:
 ./scripts/build-desktop.sh
 ```
 
+## Documentation Site
+
+The public user-facing docs are built with Docusaurus. The source Markdown lives
+in `docs/`, and the Docusaurus site shell lives in `docs-site/`.
+
+```sh
+cd docs-site
+npm install
+npm run start
+npm run build
+```
+
+The product marketing website is intentionally separate from this open-source
+repository. See `docs/website-integration.md` for the shared navigation and
+deployment contract between the public docs and the private marketing site.
+
 ## Neovim
 
 The repository includes `.nvim.lua` with project commands:

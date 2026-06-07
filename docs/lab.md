@@ -1,3 +1,9 @@
+---
+title: QEMU Lab
+description: Test BootWrangler profiles in disposable QEMU virtual machines.
+sidebar_position: 5
+---
+
 # QEMU Lab
 
 The Lab feature launches ephemeral QEMU VMs from a rendered BootWrangler profile, letting you validate installer configs before flashing to real hardware.
