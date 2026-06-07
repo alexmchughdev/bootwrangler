@@ -95,7 +95,7 @@ func TestRenderer_Render_OpenSUSEServer(t *testing.T) {
 	}
 
 	// Verify it is valid XML by unmarshaling into a generic structure.
-	var xmlDoc interface{}
+	var xmlDoc any
 	// Strip the DOCTYPE declaration which xml.Unmarshal does not handle.
 	xmlContent := stripDoctype(string(autoinstBytes))
 	if err := xml.Unmarshal([]byte(xmlContent), &struct {

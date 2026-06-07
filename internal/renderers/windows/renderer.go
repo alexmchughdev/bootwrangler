@@ -4,8 +4,10 @@ package windows
 
 import (
 	"bytes"
+	cryptorand "crypto/rand"
 	"encoding/xml"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -47,7 +49,10 @@ func (r Renderer) Render(p profile.Profile, opts render.Options) (manifest.Manif
 		Renderer:    r.Name(),
 	}
 
-	data := buildData(p, &m)
+	data, err := buildData(p, &m)
+	if err != nil {
+		return manifest.Manifest{}, fmt.Errorf("windows: %w", err)
+	}
 
 	unattend, err := renderTemplate("autounattend.xml", autounattendTmpl, data)
 	if err != nil {
@@ -109,7 +114,7 @@ type templateData struct {
 	ProvisionBlob string
 }
 
-func buildData(p profile.Profile, m *manifest.Manifest) templateData {
+func buildData(p profile.Profile, m *manifest.Manifest) (templateData, error) {
 	arch := "amd64"
 	switch p.OS.Architecture {
 	case "aarch64", "arm64":
@@ -150,8 +155,12 @@ func buildData(p profile.Profile, m *manifest.Manifest) templateData {
 		}
 	}
 	if adminPassword == "" {
-		adminPassword = "BootWrangler!Change1"
-		m.AddWarning("local administrator password is a generated placeholder — set os_specific.windows.admin_password or rotate it immediately after deployment")
+		generated, err := genAdminPassword()
+		if err != nil {
+			return templateData{}, fmt.Errorf("generate admin password: %w", err)
+		}
+		adminPassword = generated
+		m.AddWarning("a unique random local administrator password was generated; retrieve it from autounattend.xml and rotate after deployment, or set os_specific.windows.admin_password")
 	} else {
 		m.AddWarning("admin_password is written in plaintext into autounattend.xml — treat the rendered output as a secret and rotate after deployment")
 	}
@@ -187,7 +196,53 @@ func buildData(p profile.Profile, m *manifest.Manifest) templateData {
 		}
 	}
 
-	return data
+	return data, nil
+}
+
+// genAdminPassword returns a 20-character random password that satisfies
+// Windows complexity rules (lower, upper, digit, and symbol classes).
+func genAdminPassword() (string, error) {
+	const (
+		lower = "abcdefghijkmnpqrstuvwxyz"
+		upper = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+		digit = "23456789"
+		sym   = "!@#$%*-_"
+	)
+	classes := []string{lower, upper, digit, sym}
+	all := lower + upper + digit + sym
+
+	pick := func(set string) (byte, error) {
+		n, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(len(set))))
+		if err != nil {
+			return 0, err
+		}
+		return set[n.Int64()], nil
+	}
+
+	out := make([]byte, 0, 20)
+	for _, c := range classes { // guarantee one of each class
+		b, err := pick(c)
+		if err != nil {
+			return "", err
+		}
+		out = append(out, b)
+	}
+	for len(out) < 20 {
+		b, err := pick(all)
+		if err != nil {
+			return "", err
+		}
+		out = append(out, b)
+	}
+	for i := len(out) - 1; i > 0; i-- { // Fisher-Yates shuffle
+		n, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(i+1)))
+		if err != nil {
+			return "", err
+		}
+		j := int(n.Int64())
+		out[i], out[j] = out[j], out[i]
+	}
+	return string(out), nil
 }
 
 func renderTemplate(name, tmpl string, data templateData) (string, error) {

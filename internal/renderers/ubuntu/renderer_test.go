@@ -60,19 +60,19 @@ func TestRenderUserData(t *testing.T) {
 	yamlPart := lines[1]
 
 	// Must parse as valid YAML.
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := yaml.Unmarshal([]byte(yamlPart), &parsed); err != nil {
 		t.Fatalf("user-data is not valid YAML: %v\ncontent:\n%s", err, userDataStr)
 	}
 
 	// Verify autoinstall section exists.
-	autoinstall, ok := parsed["autoinstall"].(map[string]interface{})
+	autoinstall, ok := parsed["autoinstall"].(map[string]any)
 	if !ok {
 		t.Fatalf("user-data missing 'autoinstall' key, got: %v", parsed)
 	}
 
 	// Check hostname.
-	identity, ok := autoinstall["identity"].(map[string]interface{})
+	identity, ok := autoinstall["identity"].(map[string]any)
 	if !ok {
 		t.Fatalf("autoinstall missing 'identity' section")
 	}
@@ -86,11 +86,11 @@ func TestRenderUserData(t *testing.T) {
 	}
 
 	// Check SSH authorized-keys contains the first user's SSH key.
-	sshSection, ok := autoinstall["ssh"].(map[string]interface{})
+	sshSection, ok := autoinstall["ssh"].(map[string]any)
 	if !ok {
 		t.Fatalf("autoinstall missing 'ssh' section")
 	}
-	authorizedKeys, ok := sshSection["authorized-keys"].([]interface{})
+	authorizedKeys, ok := sshSection["authorized-keys"].([]any)
 	if !ok {
 		t.Fatalf("ssh missing 'authorized-keys' list")
 	}
@@ -118,7 +118,7 @@ func TestRenderMetaData(t *testing.T) {
 		t.Fatalf("read meta-data: %v", err)
 	}
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := yaml.Unmarshal(metaDataBytes, &parsed); err != nil {
 		t.Fatalf("meta-data is not valid YAML: %v", err)
 	}
