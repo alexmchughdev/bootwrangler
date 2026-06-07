@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/alexmchughdev/bootwrangler/internal/lab"
@@ -150,4 +151,19 @@ func (s *Service) LabListRuns() []lab.Run {
 		runs = append(runs, *r)
 	}
 	return runs
+}
+
+// LabQEMUStatus reports whether QEMU is available (bundled, on PATH, or
+// auto-installed) and, if absent, how it can be installed on this platform.
+func (s *Service) LabQEMUStatus() lab.Availability {
+	return lab.CheckAvailability()
+}
+
+// LabInstallQEMU installs QEMU automatically via the platform package manager
+// and returns the collected install log. On failure the error carries manual
+// setup instructions for the GUI to surface.
+func (s *Service) LabInstallQEMU() (string, error) {
+	var log []string
+	err := lab.Install(func(line string) { log = append(log, line) })
+	return strings.Join(log, "\n"), err
 }

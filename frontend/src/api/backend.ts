@@ -167,6 +167,16 @@ export interface LabRun {
   Error: string;
 }
 
+export interface QEMUAvailability {
+  installed: boolean;
+  source: string; // "bundled" | "system" | "installed" | "none"
+  version: string;
+  path: string;
+  method: string;
+  can_auto: boolean;
+  hint: string;
+}
+
 export interface ImportResult {
   Profile: Profile;
   UnsupportedFields: string[];
@@ -300,6 +310,8 @@ interface AppService {
   LabSerialLog(runID: string): Promise<string>;
   LabSSHCommand(runID: string, user: string): Promise<string>;
   LabListRuns(): Promise<LabRun[]>;
+  LabQEMUStatus(): Promise<QEMUAvailability>;
+  LabInstallQEMU(): Promise<string>;
   LabListSnapshots(runID: string): Promise<string[]>;
   LabCreateSnapshot(runID: string, name: string): Promise<void>;
   LabRevertSnapshot(runID: string, name: string): Promise<void>;
@@ -572,6 +584,26 @@ export async function labListRuns(): Promise<LabRun[]> {
   const service = getService();
   if (!service) return [];
   return service.LabListRuns();
+}
+
+export async function labQEMUStatus(): Promise<QEMUAvailability> {
+  const service = getService();
+  if (!service) {
+    return {
+      installed: false,
+      source: "none",
+      version: "",
+      path: "",
+      method: "manual",
+      can_auto: false,
+      hint: "Backend unavailable in browser preview.",
+    };
+  }
+  return service.LabQEMUStatus();
+}
+
+export async function labInstallQEMU(): Promise<string> {
+  return requireService().LabInstallQEMU();
 }
 
 export async function labListSnapshots(runID: string): Promise<string[]> {

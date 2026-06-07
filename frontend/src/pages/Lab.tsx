@@ -2,14 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   labCreateSnapshot,
   labDeleteSnapshot,
+  labInstallQEMU,
   labListRuns,
   labListSnapshots,
+  labQEMUStatus,
   labRevertSnapshot,
   labSSHCommand,
   labSerialLog,
   labStart,
   labStop,
   type LabRun,
+  type QEMUAvailability,
 } from "../api/backend";
 
 const LS_LAB_PROFILE = "bw_lab_profile_name";
@@ -231,23 +234,7 @@ export default function Lab() {
             </div>
           </div>
 
-          <div className="panel lab-requirement-panel">
-            <span className="panel-label">Requirements</span>
-            <strong className="lab-req-title">QEMU is required</strong>
-            <p>
-              The lab feature requires{" "}
-              <code className="inline-code">qemu-system-x86_64</code> to be installed and
-              available on your PATH. Install it with your system package manager:
-            </p>
-            <pre className="lab-install-hint">{`# Debian / Ubuntu
-sudo apt install qemu-system-x86
-
-# Fedora / RHEL
-sudo dnf install qemu-system-x86
-
-# Arch Linux
-sudo pacman -S qemu-full`}</pre>
-          </div>
+          <LabSetup />
         </div>
 
         <div className="lab-right">
@@ -398,6 +385,122 @@ sudo pacman -S qemu-full`}</pre>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Lab setup — QEMU status + one-click install
+// ---------------------------------------------------------------------------
+
+function LabSetup() {
+  const [status, setStatus] = useState<QEMUAvailability | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const [log, setLog] = useState("");
+  const [installError, setInstallError] = useState("");
+
+  const refresh = useCallback(async () => {
+    try {
+      setStatus(await labQEMUStatus());
+    } catch {
+      // ignore — preview mode
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function handleInstall() {
+    setInstalling(true);
+    setInstallError("");
+    setLog("");
+    try {
+      const out = await labInstallQEMU();
+      setLog(out);
+      await refresh();
+    } catch (err: unknown) {
+      setInstallError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setInstalling(false);
+    }
+  }
+
+  if (status === null) {
+    return (
+      <div className="panel lab-setup-panel">
+        <span className="panel-label">Lab Engine</span>
+        <p className="library-empty">Checking for QEMU…</p>
+      </div>
+    );
+  }
+
+  if (status.installed) {
+    const sourceLabel =
+      status.source === "bundled"
+        ? "Bundled with BootWrangler"
+        : status.source === "installed"
+          ? "Installed by BootWrangler"
+          : "Found on your system";
+    return (
+      <div className="panel lab-setup-panel lab-setup-ready">
+        <span className="panel-label">Lab Engine</span>
+        <div className="lab-ready-row">
+          <span className="lab-ready-check">✓</span>
+          <div>
+            <strong className="lab-ready-title">Lab is ready</strong>
+            <p className="lab-ready-sub">
+              {status.version || "QEMU"} · {sourceLabel}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel lab-setup-panel">
+      <span className="panel-label">Lab Engine</span>
+      <strong className="lab-req-title">One-time setup</strong>
+      <p>
+        The Lab runs your profiles in a real VM using QEMU. BootWrangler can install
+        it for you — no terminal required.
+      </p>
+
+      {status.can_auto ? (
+        <button
+          type="button"
+          className="primary-action lab-setup-btn"
+          onClick={() => void handleInstall()}
+          disabled={installing}
+        >
+          {installing ? "Setting up the lab…" : "Set Up Lab"}
+        </button>
+      ) : (
+        <div className="lab-setup-manual">
+          <p className="lab-setup-manual-note">
+            Automatic setup needs a package manager that isn't available here. Run this
+            once to finish setup:
+          </p>
+          <pre className="lab-install-hint">{status.hint}</pre>
+          <button
+            type="button"
+            className="secondary-action"
+            onClick={() => void refresh()}
+          >
+            I've installed it — recheck
+          </button>
+        </div>
+      )}
+
+      {installError && (
+        <div className="lab-setup-error">
+          <p className="render-error">{installError}</p>
+          <pre className="lab-install-hint">{status.hint}</pre>
+        </div>
+      )}
+
+      {log && <pre className="lab-setup-log">{log}</pre>}
     </div>
   );
 }

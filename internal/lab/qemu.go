@@ -8,9 +8,6 @@ import (
 	"strings"
 )
 
-const qemuBin = "qemu-system-x86_64"
-const qemuImgBin = "qemu-img"
-
 // PlanQEMU returns the argument list for qemu-system-x86_64 without executing.
 // It does not require QEMU to be installed.
 func PlanQEMU(run *Run) ([]string, error) {
@@ -33,9 +30,9 @@ func PlanQEMU(run *Run) ([]string, error) {
 // Start creates a disk image with qemu-img and starts qemu-system-x86_64 as
 // a background process. It writes the PID to WorkDir/qemu.pid.
 func Start(run *Run) error {
-	qemuPath, err := exec.LookPath(qemuBin)
-	if err != nil {
-		return fmt.Errorf("qemu-system-x86_64 not found: install qemu to use the lab")
+	tools := Locate()
+	if !tools.Available() {
+		return fmt.Errorf("QEMU is not set up: open the Lab and choose Set Up Lab to install it automatically")
 	}
 
 	// Create qcow2 disk image.
@@ -44,7 +41,7 @@ func Start(run *Run) error {
 		run.DiskPath,
 		fmt.Sprintf("%dG", run.DiskSizeGB()),
 	}
-	imgCmd := exec.Command(qemuImgBin, imgArgs...)
+	imgCmd := exec.Command(tools.ImgBinary, imgArgs...)
 	if out, err := imgCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("qemu-img create: %w: %s", err, strings.TrimSpace(string(out)))
 	}
@@ -56,7 +53,7 @@ func Start(run *Run) error {
 	}
 
 	// Launch QEMU as a background process.
-	cmd := exec.Command(qemuPath, args...)
+	cmd := exec.Command(tools.SystemBinary, args...)
 	setProcessGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		run.State = RunStateFailed

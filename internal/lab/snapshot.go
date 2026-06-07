@@ -10,7 +10,7 @@ import (
 // The VM does not need to be stopped for snapshot creation, though it is
 // recommended.
 func CreateSnapshot(run *Run, name string) error {
-	out, err := exec.Command(qemuImgBin, "snapshot", "-c", name, run.DiskPath).CombinedOutput()
+	out, err := exec.Command(qemuImgPath(), "snapshot", "-c", name, run.DiskPath).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("create snapshot %q: %w: %s", name, err, strings.TrimSpace(string(out)))
 	}
@@ -19,7 +19,7 @@ func CreateSnapshot(run *Run, name string) error {
 
 // ListSnapshots returns the names of all snapshots stored in the disk image.
 func ListSnapshots(run *Run) ([]string, error) {
-	out, err := exec.Command(qemuImgBin, "snapshot", "-l", run.DiskPath).Output()
+	out, err := exec.Command(qemuImgPath(), "snapshot", "-l", run.DiskPath).Output()
 	if err != nil {
 		return nil, fmt.Errorf("list snapshots: %w", err)
 	}
@@ -29,7 +29,7 @@ func ListSnapshots(run *Run) ([]string, error) {
 // RevertSnapshot applies a named snapshot, restoring the disk to that state.
 // The VM must be stopped before calling this function.
 func RevertSnapshot(run *Run, name string) error {
-	out, err := exec.Command(qemuImgBin, "snapshot", "-a", name, run.DiskPath).CombinedOutput()
+	out, err := exec.Command(qemuImgPath(), "snapshot", "-a", name, run.DiskPath).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("revert snapshot %q: %w: %s", name, err, strings.TrimSpace(string(out)))
 	}
@@ -38,7 +38,7 @@ func RevertSnapshot(run *Run, name string) error {
 
 // DeleteSnapshot removes a named snapshot from the disk image.
 func DeleteSnapshot(run *Run, name string) error {
-	out, err := exec.Command(qemuImgBin, "snapshot", "-d", name, run.DiskPath).CombinedOutput()
+	out, err := exec.Command(qemuImgPath(), "snapshot", "-d", name, run.DiskPath).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("delete snapshot %q: %w: %s", name, err, strings.TrimSpace(string(out)))
 	}
